@@ -50,26 +50,23 @@ mcp__supabase__execute_sql(
 
 The statement contains the entire 1536-dim vector literal. Do not modify it.
 
-## 4) Hybrid search (embed first)
+## 4) Hybrid search (gemini_embed_vault inline)
+
+`gemini_embed_vault()` reads the Gemini key from Vault and generates the embedding inside Postgres. No local Python step is needed.
 
 ```python
-# 1. local embed
-q_vec = subprocess.run(
-    ["python","embed_query.py","복지로 SNS 숏폼 전략"],
-    capture_output=True, text=True
-).stdout.strip()
-
-# 2. call RPC via SQL
 mcp__supabase__execute_sql(
     project_id = "<ref>",
-    query = f"""
+    query = """
         select * from match_proposals(
-            query_text       => '복지로 SNS 숏폼 전략',
-            query_embedding  => '{q_vec}'::vector(1536),
+            query_text       => '복지로 SNS 숏폼 전략 홍보 캠페인 콘텐츠 제작',
+            query_embedding  => gemini_embed_vault('복지로 SNS 숏폼 전략 홍보 캠페인 콘텐츠 제작'),
             filter_year_min  => 2024,
             filter_industry  => '복지',
             filter_tags      => null,
-            match_count      => 10
+            match_count      => 10,
+            vec_weight       => 0.8,
+            kw_weight        => 0.2
         );
     """,
 )

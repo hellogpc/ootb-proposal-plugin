@@ -10,7 +10,7 @@ can do:
 
 Search order:
   1. $OOTB_ENV_FILE       (explicit override)
-  2. default_env_path()   (user config — where configure-env writes)
+  2. default_env_path()   (user config location, optional)
          macOS:   ~/Library/Application Support/ootb-proposal-automation/.env
          Linux:   $XDG_CONFIG_HOME/ootb-proposal-automation/.env (or ~/.config)
          Windows: %APPDATA%/ootb-proposal-automation/.env

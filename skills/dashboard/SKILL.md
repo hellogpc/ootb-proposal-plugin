@@ -14,14 +14,15 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 
 ### Step 1 — 상태 수집
 
-실행 전 두 가지를 조용히 확인:
+실행 전 두 가지를 조용히 확인 (Supabase MCP 사용):
 
-1. **환경변수**: `python3 "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/_env.py"` 실행  
-   → `.env` 존재 여부 확인 (GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+1. **Vault 시크릿**:  
+   `select name from vault.decrypted_secrets where name in ('gemini_api_key','supabase_service_role_key');`  
+   → 두 시크릿 존재 여부 확인. MCP 미연결이면 "➖ MCP 미연결".
 
-2. **DB 문서 수**: Supabase MCP 연결 상태이면  
-   `mcp__supabase__execute_sql` → `select count(*) from proposals;`  
-   연결 안 됐으면 "—" 표시
+2. **DB 문서 수**:  
+   `select count(*) from proposals;`  
+   MCP 연결 안 됐으면 "—" 표시.
 
 ### Step 2 — 대시보드 렌더링
 
@@ -33,7 +34,7 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 
 | | 항목 | 상태 |
 |:---:|---|---|
-| 🔑 | 환경변수 | ✅ 설정됨 / ❌ 미설정 |
+| 🔐 | Vault 시크릿 | ✅ 등록됨 / ❌ 미등록 / ➖ MCP 미연결 |
 | 🗄️ | DB 연결 | ✅ 연결됨 / ❌ 미연결 / ➖ MCP 미연결 |
 | 📁 | 등록 제안서 | **N건** / — |
 
@@ -46,17 +47,22 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 | 📂 | **문서 등록** | 과거 제안서 PDF를 DB에 수집 |
 | 📋 | **문서 목록** | 등록된 제안서 조회 및 삭제 |
 | ✨ | **제안서 작성** | RFP → 유사 사례 검색 → PPT 초안 생성 |
-| ⚙️ | **환경변수 설정** | Gemini / Supabase 키 입력 |
 
 ---
 ```
+
+> Vault 시크릿이 미등록이면 메뉴 아래에 안내 추가:
+> ```sql
+> select vault.create_secret('<GEMINI_API_KEY>', 'gemini_api_key', 'Gemini embed');
+> select vault.create_secret('<SERVICE_ROLE_KEY>', 'supabase_service_role_key', 'Storage');
+> ```
 
 ### Step 3 — AskUserQuestion으로 메뉴 선택
 
 ```
 AskUserQuestion(
   question: "원하는 기능을 선택하세요",
-  options: ["📂 문서 등록", "📋 문서 목록", "✨ 제안서 작성", "⚙️ 환경변수 설정"]
+  options: ["📂 문서 등록", "📋 문서 목록", "✨ 제안서 작성"]
 )
 ```
 
@@ -204,30 +210,6 @@ AskUserQuestion(
 ```
 
 완료 후 → AskUserQuestion(["🏠 메뉴로 돌아가기", "📂 다른 RFP로 작성", "📋 문서 목록 보기"])
-
----
-
-### ⚙️ 환경변수 설정
-
-```
----
-### ⚙️ 환경변수 설정
-
-현재 상태:
-
-| 키 | 상태 |
-|---|---|
-| GEMINI_API_KEY | ✅ 설정됨 / ❌ 미설정 |
-| SUPABASE_URL | ✅ 설정됨 / ❌ 미설정 |
-| SUPABASE_SERVICE_ROLE_KEY | ✅ 설정됨 / ❌ 미설정 |
-
----
-```
-
-AskUserQuestion(["🖥️ TUI 마법사 실행 (권장)", "✏️ 직접 키 입력", "🏠 메뉴로 돌아가기"])
-
-- **TUI 마법사**: `configure-env` 스킬 실행
-- **직접 입력**: AskUserQuestion으로 키 하나씩 수집 → `configure_env.py --gemini-key ... --supabase-url ... --supabase-key ...` 실행
 
 ---
 

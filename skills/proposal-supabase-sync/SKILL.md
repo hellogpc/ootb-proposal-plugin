@@ -170,17 +170,6 @@ returning id, title, project_year;
 
 완료 후 user에게 보고: "✅ 등록 완료 — id=N, 제목: ..."
 
-### Path B-3 — Storage backfill (no Gemini calls)
-
-When rows exist but `storage_path` is a `file://` placeholder (typical after B-2), upload originals and patch the rows without re-embedding:
-
-```bash
-cd scripts
-python upload_storage.py /abs/path/to/*.pdf
-```
-
-Per file this script: SHA-256s locally → looks up matching row via PostgREST → uploads to `proposals/<year>/<filename>` with `x-upsert: true` → PATCHes `storage_bucket`/`storage_path` on the row. Gemini key is not required. Run from a host that can reach `*.supabase.co` (typically the user's Mac).
-
 ## Path C — Search
 
 `gemini_embed_vault()` DB 함수가 Supabase Vault에서 Gemini API 키를 읽어 임베딩을 생성합니다. 로컬 Python 실행 없이 MCP SQL 한 번으로 검색 완료.
@@ -227,21 +216,23 @@ Prefer `execute_sql` with small explicit `select` over pulling whole rows.
 
 - `SKILL.md` — this file.
 - `sql/001_init.sql` — full schema bootstrap, feed into `apply_migration` on first use.
-- `scripts/prep.py` — local PDF → text → Gemini → (optional Storage upload) → JSON with `sql_upsert`.
-- `scripts/requirements.txt` — `pdfplumber`, `google-genai`, `python-dotenv`, `requests` (no `supabase-py`).
-- `scripts/.env.example` — env template.
-- `references/mcp_playbook.md` — exact MCP call parameters for each Path (read this if unsure of the tool name or arg shape).
+- `sql/002_embed_in_db.sql` — installs `http` extension + `gemini_embed(text, key)` (prereq for 003).
+- `sql/003_vault_helpers.sql` — `gemini_embed_vault()`, `sign_storage_url()`, `match_proposals_with_url()`.
+- `sql/004_upload_via_vault.sql` — `upload_pdf_via_vault(path, b64)` for env-free Storage upload.
+- `scripts/prep.py` — local PDF → text + base64 → JSON. No Gemini, no SUPABASE creds.
+- `scripts/requirements.txt` — `pdfplumber`, `python-dotenv`, `requests`.
+- `edge-functions/upload-b64/index.ts` — Edge Function that decodes base64 + writes to Storage.
+- `mcp_playbook.md` — exact MCP call parameters for each Path.
 
-## Design notes (why this split)
+## Design notes
 
-- **SQL through MCP, binary through HTTP.** MCP JSON-RPC is great for SQL and project admin but wasn't designed for streaming 10–30 MB PDF bytes. Storage upload stays in Python over `POST /storage/v1/object/proposals/...`.
-- **Gemini stays in Python.** MCP doesn't expose Gemini; we need LLM calls anyway for both structured extraction and embeddings, so the Python prep step carries them.
-- **Single-user schema.** No `owner_id`, no RLS policies — this matches a single-developer proposal library and keeps MCP's admin context a good fit. Adding RLS later is additive (add column + policies) and doesn't break anything here.
+- **All credentials live in Supabase Vault.** Local Python doesn't need `GEMINI_API_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The DB-side functions (`gemini_embed_vault`, `upload_pdf_via_vault`) read keys from `vault.decrypted_secrets`.
+- **Binary upload via base64 + Edge Function.** PDFs travel as base64 inside an MCP `execute_sql` call → DB calls the `upload-b64` Edge Function → Edge Function decodes and writes to Storage. Keep PDFs under ~10 MB to stay safe with SQL body limits.
 - **Idempotent by `file_hash`.** Same PDF uploaded twice just UPDATEs the row. Different content = different hash = new row.
 
 ## Common failure modes
 
 - **"ERROR: relation proposals does not exist"** — Path A wasn't run. Run it.
 - **"auth error" from MCP** — Supabase MCP OAuth session expired. Tell user to reconnect in Cowork settings.
-- **Vector literal rejected with "dimension mismatch"** — `EMBED_DIM` in `.env` diverged from `vector(1536)` in init SQL. Rebuild embeddings or alter column.
-- **Storage upload 413 Payload Too Large** — bucket file size limit hit. Default is 100 MB; raise in `sql/001_init.sql` (`file_size_limit`) and reapply, or skip storage upload with `prep.py --no-upload`.
+- **"gemini_api_key secret not set in vault"** — Run `select vault.create_secret('<KEY>', 'gemini_api_key', 'Gemini embed');`.
+- **Storage upload 413 Payload Too Large** — PDF too large for SQL body. Use Supabase Dashboard direct upload then PATCH `storage_path`.
