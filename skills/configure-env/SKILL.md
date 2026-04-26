@@ -1,11 +1,11 @@
 ---
 name: configure-env
-description: "Set or update plugin env vars (Gemini, Supabase) without manually editing .env. Triggers: '환경변수 설정', '키 세팅', '.env 만들어줘', 'Gemini 키 넣어줘', 'Supabase 키 바꿔줘', '키 로테이션', '/setup-env', 'configure env'. Also auto-runs at first DB request if .env is missing. Collects keys via AskUserQuestion, writes to a user-writable location (~/Library/Application Support/ootb-proposal-automation/.env on macOS) with atomic write + backup + mode 600, optionally validates with live HTTP checks. Do NOT use for MCP connector setup (that's in Claude UI)."
+description: "Set or update plugin env vars (Gemini, Supabase) without manually editing .env. Triggers: '환경변수 설정', '키 세팅', '.env 만들어줘', 'Gemini 키 넣어줘', 'Supabase 키 바꿔줘', '키 로테이션', '/setup-env', 'configure env'. Also auto-runs at first DB request if .env is missing. Launches interactive TUI wizard (rich + questionary) via `python configure_env.py` — no AskUserQuestion needed. Writes to a user-writable location (~/Library/Application Support/ootb-proposal-automation/.env on macOS) with atomic write + backup + mode 600, optionally validates with live HTTP checks. Do NOT use for MCP connector setup (that's in Claude UI)."
 ---
 
 # configure-env — 플러그인 환경변수 설정
 
-이 스킬은 플러그인의 `.env`를 **사용자가 손으로 편집하지 않고** 대화식으로 생성/갱신합니다.
+이 스킬은 플러그인의 `.env`를 **터미널 TUI 마법사**로 생성/갱신합니다. 사용자가 키를 직접 채팅창에 붙여넣지 않아도 됩니다.
 
 ## 중요 — 설치 디렉터리는 read-only
 
@@ -37,48 +37,57 @@ description: "Set or update plugin env vars (Gemini, Supabase) without manually 
 
 ## Claude 가 따라야 할 순서
 
-1. **현재 상태 확인** (플러그인 root 에서 _env 리졸버 실행)
-   ```bash
-   python3 "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/_env.py"
-   ```
-   이미 어딘가에 `.env` 가 있으면 "교체할까요, 누락된 키만 채울까요?" 로 확인.
+### 사전 준비 (최초 1회)
 
-2. **AskUserQuestion 으로 값 받기** — 민감값은 반드시 이 도구 경유:
+```bash
+pip install -r "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/requirements.txt"
+```
 
-   | key | 질문 | 필수 | 기본값 |
-   |-----|------|------|--------|
-   | `GEMINI_API_KEY` | "Google AI Studio 의 Gemini API 키(`AIza...`)" | ✅ | — |
-   | `SUPABASE_URL`   | "Supabase 프로젝트 URL (`https://<ref>.supabase.co`)" | ✅ | — |
-   | `SUPABASE_SERVICE_ROLE_KEY` | "Service Role Key (`eyJ...` JWT)" | ✅ | — |
-   | `SUPABASE_BUCKET` | "Storage 버킷 이름" | ⬜ | `proposals` |
-   | `GEMINI_CHAT_MODEL` | "Gemini Chat 모델" | ⬜ | `gemini-2.5-flash` |
-   | `GEMINI_EMBED_MODEL` | "Gemini Embedding 모델" | ⬜ | `gemini-embedding-001` |
-   | `EMBED_DIM` | "임베딩 차원 (DB column 과 일치)" | ⬜ | `1536` |
+### TUI 마법사 실행 (권장)
 
-3. **`.env` 쓰기** — 번들된 헬퍼 스크립트 사용:
-   ```bash
-   python3 "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/configure_env.py" \
-     --gemini-key     "$GEMINI_API_KEY" \
-     --supabase-url   "$SUPABASE_URL" \
-     --supabase-key   "$SUPABASE_SERVICE_ROLE_KEY" \
-     --bucket         "${SUPABASE_BUCKET:-proposals}" \
-     --gemini-chat-model  "${GEMINI_CHAT_MODEL:-gemini-2.5-flash}" \
-     --gemini-embed-model "${GEMINI_EMBED_MODEL:-gemini-embedding-001}" \
-     --embed-dim      "${EMBED_DIM:-1536}" \
-     --validate
-   ```
+```bash
+python3 "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/configure_env.py"
+```
 
-   헬퍼 동작:
-   - 기본 target: OS별 user config 위치 (위 표)
-   - `--target /path` 로 override 가능
-   - 기존 파일 있으면 `.env.bak.<timestamp>` 로 자동 백업
-   - 원자적 쓰기 (`.env.new` → `os.replace`)
-   - mode 600 설정
-   - `--validate` 로 Supabase REST + Gemini Embedding 엔드포인트 라이브 확인
+인수 없이 실행하면 **터미널 TUI 마법사**가 자동으로 시작됩니다:
 
-4. **성공 보고**:
-   > ✅ 환경변수 설정 완료 (`<경로>`). 이제 `proposal-supabase-sync` 스킬이 바로 동작합니다.
-   > 다음 단계: *"DB 처음 셋업해줘"* 또는 *"이 PDF 등록해줘"*
+1. 현재 설정 상태 표 (어떤 키가 세팅됐는지 마스킹해 표시)
+2. 기존 .env가 있으면 "누락된 키만 채우기 / 전체 다시 입력 / 취소" 선택
+3. 필수 키 입력 — 패스워드 마스킹, 형식 즉시 검증
+4. 선택 설정 기본값 확인 (한 번에 수락 가능)
+5. 저장할 내용 요약 확인 후 Supabase + Gemini 라이브 검증
+6. 완료 메시지 및 다음 단계 안내
+
+사용자는 키를 채팅창에 입력하지 않아도 됩니다 — 마법사가 터미널에서 직접 입력을 받습니다.
+
+### 스크립트 모드 (CI/자동화 전용)
+
+AskUserQuestion으로 키를 받은 경우에만 아래 방식 사용:
+
+```bash
+python3 "$CLAUDE_PLUGIN_ROOT/skills/configure-env/scripts/configure_env.py" \
+  --gemini-key     "$GEMINI_API_KEY" \
+  --supabase-url   "$SUPABASE_URL" \
+  --supabase-key   "$SUPABASE_SERVICE_ROLE_KEY" \
+  --bucket         "${SUPABASE_BUCKET:-proposals}" \
+  --gemini-chat-model  "${GEMINI_CHAT_MODEL:-gemini-2.5-flash}" \
+  --gemini-embed-model "${GEMINI_EMBED_MODEL:-gemini-embedding-001}" \
+  --embed-dim      "${EMBED_DIM:-1536}" \
+  --validate
+```
+
+헬퍼 동작 (두 모드 공통):
+- 기본 target: OS별 user config 위치 (위 표)
+- `--target /path` 로 override 가능
+- 기존 파일 있으면 `.env.bak.<timestamp>` 로 자동 백업
+- 원자적 쓰기 (`.env.new` → `os.replace`)
+- mode 600 설정
+
+### 성공 보고
+
+TUI 마법사가 완료 메시지를 직접 표시합니다. Claude는 추가로:
+> ✅ 환경변수 설정 완료. 이제 `proposal-supabase-sync` 스킬이 바로 동작합니다.
+> 다음 단계: *"DB 처음 셋업해줘"* 또는 *"이 PDF 등록해줘"*
 
 ## Vault 로테이션 플로우
 

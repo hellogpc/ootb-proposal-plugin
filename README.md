@@ -42,6 +42,7 @@ Claude 채팅창에:
 ## 의존성 (최초 1회)
 
 ```bash
+pip install -r skills/configure-env/scripts/requirements.txt          # TUI 마법사 (rich, questionary)
 pip install -r skills/proposal-supabase-sync/scripts/requirements.txt
 pip install -r skills/rfp-to-proposal-pipeline/scripts/requirements.txt
 pip install -r skills/ootb-proposal-pptx/scripts/requirements.txt
