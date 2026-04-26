@@ -6,24 +6,30 @@ Claude Cowork 에 설치해 과거 제안서를 DB 에 쌓고, 새 RFP/과업지
 
 | 스킬 | 역할 |
 |---|---|
+| **`dashboard`** | ⭐ **메인 진입점**. 채팅 안에서 마크다운 카드 + AskUserQuestion으로 대화형 메뉴 제공 |
 | **`configure-env`** | 터미널 TUI 마법사로 Gemini/Supabase 키를 대화식 입력 · 검증 · 저장 |
 | `proposal-supabase-sync` | 과거 제안서 PDF 를 Supabase DB + Storage 에 수집하고, 벡터·키워드·메타 하이브리드 검색 제공 |
 | `rfp-to-proposal-pipeline` | **오케스트레이터**. 새 RFP → 유사 사례 top-3 검색 → outline.yaml 합성 |
 | `ootb-proposal-pptx` | outline.yaml 을 OOTB 브랜드 포맷의 `.pptx` 로 렌더 (pptxgenjs) |
-| **`web-ui`** | 로컬 웹 UI (FastAPI + 브라우저). 문서 업로드 · 목록 · 삭제 / RFP → PPT 초안 생성 · 다운로드 |
+| `web-ui` | 로컬 웹 UI (FastAPI + 브라우저). 문서 업로드 · 목록 · 삭제 / RFP → PPT 초안 생성 · 다운로드 |
 
 ## 2분 시작법
 
-**Claude 채팅창에서 (MCP 경로):**
+**Claude 채팅창에서 (권장 — 대시보드 UI):**
 ```
-1. "Supabase MCP 커넥터 설정 도와줘"           # Claude Settings → Connectors → Supabase
-2. "환경변수 설정해줘"                           # TUI 마법사로 Gemini/Supabase 키 입력
-3. "DB 처음 셋업해줘"                            # 스키마 자동 적용
-4. "이 PDF 등록해줘: <경로>"                     # 과거 제안서 수집
-5. "이 RFP 로 제안서 초안 짜줘: <경로>"          # ⭐ 핵심 기능
+"대시보드 보여줘"   또는   "메뉴 열어줘"
+```
+→ 채팅 안에서 상태 카드 + 메뉴가 표시되고, 선택지를 클릭해 모든 기능 사용 가능
+
+**초기 설정 순서:**
+```
+1. "Supabase MCP 커넥터 설정 도와줘"   # Claude Settings → Connectors → Supabase
+2. "환경변수 설정해줘"                   # TUI 마법사로 Gemini/Supabase 키 입력
+3. "DB 처음 셋업해줘"                    # 스키마 자동 적용
+4. "대시보드 보여줘"                     # 이후 모든 작업은 메뉴에서
 ```
 
-**브라우저 UI로 사용하기 (web-ui):**
+**브라우저 UI로 사용하기 (선택):**
 ```bash
 pip install -r skills/web-ui/scripts/requirements.txt
 python skills/web-ui/scripts/server.py
