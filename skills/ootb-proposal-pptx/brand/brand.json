@@ -1,0 +1,64 @@
+{
+  "$schema_version": "1.0",
+  "_comment": "OOTB Lab 제안서 브랜드 토큰. 렌더링 엔진(pptxgenjs 등)이 읽어서 사용. 팔레트/폰트/치수 변경은 여기서만.",
+
+  "company_name": "(주)오오티비랩",
+
+  "slide": {
+    "width_inch":  13.333,
+    "height_inch": 7.5,
+    "layout":      "LAYOUT_WIDE",
+    "margin": {
+      "left":   0.8,
+      "right":  0.8,
+      "top":    0.6,
+      "bottom": 0.6
+    }
+  },
+
+  "palette": {
+    "navy_deep":   "0F1E3C",
+    "navy":        "123876",
+    "navy_soft":   "17365D",
+    "blue":        "0087FF",
+    "blue_bright": "1685FB",
+    "blue_light":  "AFD6FE",
+    "white":       "FFFFFF",
+    "bg_light":    "EDEFEF",
+    "text_dark":   "1A1A1A",
+    "text_muted":  "6B7280"
+  },
+
+  "fonts": {
+    "latin":          "Arial",
+    "east_asian":     "Pretendard",
+    "east_asian_fallbacks": ["Noto Sans KR", "Malgun Gothic"]
+  },
+
+  "sizes_pt": {
+    "cover_title":      48,
+    "cover_date":       14,
+    "cover_company":    14,
+
+    "toc_label":        48,
+    "toc_num":          18,
+    "toc_item":         22,
+
+    "section_num":      54,
+    "section_title":    44,
+
+    "hero_eyebrow":     16,
+    "hero_headline":    92,
+    "hero_sub":         24,
+
+    "breadcrumb":       10,
+    "content_title":    26,
+    "flow_heading":     16,
+    "flow_body":        12,
+    "img_body":         14,
+
+    "closing":          56,
+    "closing_tagline":  16,
+    "page_num":         9
+  }
+}

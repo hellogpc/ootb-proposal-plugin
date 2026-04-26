@@ -1,0 +1,88 @@
+# =====================================================================
+# OOTB Proposal PPT - outline example
+# =====================================================================
+# Edit this file, then run:
+#   python scripts/build.py templates/outline.example.yaml -o my_deck.pptx
+# =====================================================================
+
+brand:
+  company_name: "(주)오오티비랩"
+  # Optional file paths (relative to the yaml file). If missing, layouts fall
+  # back to pure-shape rendering with no errors.
+  # logo: assets/logo.png
+  # mascot: assets/mascot.png
+  # cover_bg: assets/cover_bg.jpg
+
+project:
+  title: "2026년 수산물이력제 홍보사업 제안"
+  date: "2026. 3. 20."
+
+slides:
+
+  # -----------------------------------------------------------------
+  # 1) Cover
+  # -----------------------------------------------------------------
+  - type: cover
+
+  # -----------------------------------------------------------------
+  # 2) Table of contents ("Index")
+  # -----------------------------------------------------------------
+  - type: toc
+    items:
+      - "환경분석"
+      - "과업이해"
+      - "수행전략"
+      - "세부실행계획"
+
+  # -----------------------------------------------------------------
+  # 3) Section divider — big roman numeral or 01, 02...
+  # -----------------------------------------------------------------
+  - type: section_divider
+    number: "I"
+    title: "환경분석"
+
+  # -----------------------------------------------------------------
+  # 4) Hero — large centered statement
+  # -----------------------------------------------------------------
+  - type: hero
+    eyebrow: "[수산물이력제의 의미 재정립]"
+    headline: "수산물이력제"
+    subheadline: "믿고 먹는 수산물, 생산자와 소비자가 함께 만드는 투명한 유통"
+    highlight: "투명한 유통"    # this phrase gets accent color
+
+  # -----------------------------------------------------------------
+  # 5) Content — flow of 2–4 circle blocks connected by arrows
+  # -----------------------------------------------------------------
+  - type: content
+    breadcrumb: "환경분석 | 과제 및 목적"
+    title: "사업 추진 배경 및 서비스 분석에 기반한 전략적 홍보 추진"
+    body:
+      - heading: "홍보목적"
+        text: "수산물이력제 인지도 제고 및 이용률 향상"
+      - heading: "과업배경"
+        text: "국민의 수산물 안전성 체감도 제고 필요 / 이력제 확산"
+      - heading: "추진방향"
+        text: "타깃 맞춤형 온·오프라인 통합 캠페인 전개"
+      - heading: "홍보과제"
+        text: "효율적 홍보 콘텐츠 기획 및 제작"
+
+  # -----------------------------------------------------------------
+  # 6) Content with side image
+  # -----------------------------------------------------------------
+  - type: content_image
+    breadcrumb: "수행전략 | 채널 전략"
+    title: "MZ 공감형 숏폼 콘텐츠로 신뢰성 있게 알리는 수산물이력제"
+    # image: assets/sample.png         # optional — falls back to a placeholder block
+    image_position: right
+    text: |
+      · 인스타그램 릴스·유튜브 쇼츠를 중심으로 제작
+      · 방송기자 출신 크리에이터와의 협업으로 정보 전달 신뢰도 제고
+      · 어촌 현장 및 유통 단계별 검증 콘텐츠 시리즈화
+      · 주간 2편 이상 업로드로 노출 총량 확보
+
+  # -----------------------------------------------------------------
+  # 7) Closing — 감사합니다
+  # -----------------------------------------------------------------
+  - type: closing
+    message: "감사합니다"
+    tagline: "㈜오오티비랩과 함께하겠습니다"

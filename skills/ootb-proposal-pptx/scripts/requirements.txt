@@ -1,0 +1,2 @@
+# prepare_deck.py 전용 (PPT 렌더링은 pptxgenjs/Node로 이관 — scripts/package.json 참고)
+PyYAML>=6.0

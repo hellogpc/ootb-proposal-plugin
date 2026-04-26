@@ -1,0 +1,12 @@
+{
+  "name": "ootb-proposal-pptx-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reference pptxgenjs renderer for OOTB Lab 제안서 deck_plan.json",
+  "scripts": {
+    "render": "node render_deck.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0"
+  }
+}

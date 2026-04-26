@@ -1,0 +1,18 @@
+-- DEPRECATED. Moved to sql/001_init.sql at the skill root and now designed
+-- to be passed to Supabase MCP's apply_migration, not to the SQL Editor.
+-- The v1 schema in this file used owner_id + RLS; the v2 schema is
+-- single-user and simpler. If you already created tables from this file,
+-- see the migration note below.
+--
+--   Option A (clean start):
+--     drop table public.proposals cascade;
+--     then apply sql/001_init.sql via MCP.
+--
+--   Option B (in-place):
+--     alter table public.proposals drop column owner_id;
+--     drop policy if exists "owner can select" on public.proposals;
+--     drop policy if exists "owner can insert" on public.proposals;
+--     drop policy if exists "owner can update" on public.proposals;
+--     drop policy if exists "owner can delete" on public.proposals;
+--     alter table public.proposals disable row level security;
+--     -- then re-apply sql/001_init.sql (idempotent bits will no-op).
