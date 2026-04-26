@@ -74,59 +74,83 @@ longer appear in query text or `pg_stat_statements`.
 
 ## Path B — Ingest PDFs
 
-For each PDF the user wants to add:
+`GEMINI_API_KEY` 는 로컬에 불필요합니다. 텍스트 추출은 `prep.py`(Python), 구조화 추출은 Claude, 임베딩은 DB 내 `gemini_embed_vault()`가 담당합니다.
 
-### Path B-1 (default) — Local Gemini (Python)
+### Path B-1 — 텍스트 추출 (Python)
 
-1. **Prep locally** (Python):
-   ```bash
-   cd scripts
-   python prep.py /abs/path/to/file.pdf --out /tmp/proposal_$HASH.json
-   ```
-   `prep.py` does:
-   - SHA-256 of file (for dedup)
-   - Extract text with `pdfplumber`
-   - Gemini structured extraction (strict JSON schema)
-   - Gemini embedding (1536 dims via Matryoshka)
-   - (default) Upload the PDF to Supabase Storage bucket `proposals` via HTTP using `SUPABASE_SERVICE_ROLE_KEY`
-   - Emit a JSON payload that includes a **pre-built SQL `sql_upsert` statement** — Claude just forwards it to MCP.
+```bash
+cd scripts
+python prep.py /abs/path/to/file.pdf --out /tmp/prep.json
+```
 
-2. **Read the JSON** (you now have `{file_hash, storage_path, title, ..., sql_upsert}`).
+`prep.py`가 하는 일:
+- SHA-256 해시 (중복 방지)
+- `pdfplumber`로 텍스트 추출
+- (기본) Supabase Storage에 PDF 업로드 (`SUPABASE_SERVICE_ROLE_KEY` 필요)
+- 출력: `{file_hash, file_name, file_size, page_count, storage_bucket, storage_path, full_text}`
 
-3. **Check for duplicates** (optional, recommended):
-   ```
-   mcp__supabase__execute_sql:
-     query: select id from proposals where file_hash = '<hash>';
-   ```
-   If a row exists and user didn't say "force", tell them it's already ingested.
+### Path B-2 — 구조화 추출 (Claude)
 
-4. **Upsert via MCP**:
-   ```
-   mcp__supabase__execute_sql:
-     query: <contents of payload.sql_upsert>
-   ```
-   The statement is `INSERT ... ON CONFLICT (file_hash) DO UPDATE SET ... RETURNING id`.
+`/tmp/prep.json`의 `full_text`를 읽고, 아래 스키마에 맞춰 메타데이터를 추출:
 
-5. Report to user: "3건 등록 — id=[12,13,14]".
+```
+title            string           제안서 제목
+project_year     integer | null   사업 연도
+client_name      string | null    발주처
+client_type      enum | null      공공 / 민간 / 지자체 / 기타
+industry         string | null    분야 (복지/수산/환경/관광 등)
+service_category string[]         제공 서비스 분류 (홍보/콘텐츠/플랫폼 등)
+budget_krw       integer | null   예산(원)
+submitted_at     string | null    제출일 YYYY-MM-DD
+abstract         string           한 문단 요약 (3~5문장)
+key_points       string[]         핵심 포인트 3~7개
+objectives       string | null    사업 목적
+strategy         string | null    추진 전략
+deliverables     string[]         주요 산출물
+tags             string[]         검색 키워드 5~12개
+```
 
-> **Note**: The SQL `sql_upsert` contains a large vector literal (~20 KB of floats). MCP handles this fine; do not try to summarize or truncate.
+확실하지 않은 필드는 null. 추측 금지.
 
-### Path B-2 (fallback) — DB-side Gemini (when local network is blocked)
+### Path B-3 — DB 업서트 (MCP)
 
-Use this when `prep.py` fails on `httpx.ProxyError` / `403 Forbidden` toward `generativelanguage.googleapis.com` (typical in restricted sandboxes/CI).
+추출한 메타데이터와 prep.json 파일 정보를 조합해 아래 SQL을 빌드하고 MCP로 실행:
 
-Prerequisite: apply Path A-2 once.
+```sql
+insert into public.proposals (
+  storage_bucket, storage_path, file_name, file_hash, file_size, page_count, mime_type,
+  doc_type, title, project_year, client_name, client_type, industry, service_category,
+  budget_krw, submitted_at, abstract, key_points, objectives, strategy, deliverables, tags,
+  full_text, embedding, embedding_model
+) values (
+  '<storage_bucket>', '<storage_path>', '<file_name>', '<file_hash>',
+  <file_size>, <page_count>, 'application/pdf', '제안서',
+  '<title>', <project_year|null>, '<client_name>', '<client_type>',
+  '<industry>', array['<cat1>','<cat2>'],
+  <budget_krw|null>, '<submitted_at>',
+  $abs$<abstract>$abs$,
+  array['<kp1>','<kp2>'],
+  $obj$<objectives>$obj$,
+  $str$<strategy>$str$,
+  array['<del1>','<del2>'],
+  array['<tag1>','<tag2>'],
+  $ft$<full_text>$ft$,
+  gemini_embed_vault($emb$TITLE: <title>
+ABSTRACT: <abstract>
+KEY_POINTS: <kp1> / <kp2>
+TAGS: <tag1>, <tag2>$emb$),
+  'gemini-embedding-001'
+)
+on conflict (file_hash) do update set
+  title=excluded.title, abstract=excluded.abstract, tags=excluded.tags,
+  embedding=excluded.embedding, full_text=excluded.full_text,
+  updated_at=now()
+returning id, title, project_year;
+```
 
-1. Extract text + synthesize metadata locally **without** calling Gemini. Either run `prep.py --no-upload --skip-embed` (if available) or have Claude read the PDF text via `pdfplumber` and build the structured metadata itself. Produce the same field set as Path B-1, **minus** the `embedding` vector literal.
-2. Build the UPSERT SQL with `public.gemini_embed(<embed_input>, <key>)` inline in place of the vector literal:
-   ```sql
-   insert into public.proposals (..., embedding, ...)
-   values (..., public.gemini_embed('TITLE: ...\nABSTRACT: ...\n...', 'AIza...'), ...)
-   on conflict (file_hash) do update set ...;
-   ```
-3. Execute via `mcp__supabase__execute_sql`. The DB calls Gemini from its own network and stores the vector.
-4. **Rotate the Gemini key** once ingestion is done (the key appears in query logs).
-5. Storage upload is not possible via the DB. Store `storage_path = 'file:///<name>.pdf'` temporarily, then run Path B-3 below from a machine with network access.
+> `$ft$...$ft$`, `$emb$...$emb$` 는 Postgres dollar-quoting — 본문에 작은따옴표가 있어도 안전.
+
+완료 후 user에게 보고: "✅ 등록 완료 — id=N, 제목: ..."
 
 ### Path B-3 — Storage backfill (no Gemini calls)
 
