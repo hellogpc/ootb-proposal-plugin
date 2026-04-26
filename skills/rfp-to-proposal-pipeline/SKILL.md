@@ -48,9 +48,7 @@ python prep_rfp.py /abs/path/to/RFP.pdf -o /tmp/rfp.json
 
 ### Step 2 — Find top-3 similar past proposals (via MCP)
 
-Read `/tmp/rfp.json`. Then call MCP. **Prefer `match_proposals_with_url`** when
-the sibling skill's `sql/003_vault_helpers.sql` has been applied — you'll get
-signed URLs to the original PDFs for free:
+Read `/tmp/rfp.json`. `gemini_embed_vault()` DB 함수가 Gemini 임베딩을 DB 내부에서 직접 생성하므로, 로컬 Python 실행 없이 MCP SQL 한 번으로 처리:
 
 ```python
 mcp__supabase__execute_sql(
@@ -59,20 +57,22 @@ mcp__supabase__execute_sql(
         select id, title, client_name, project_year, industry, tags,
                hybrid_score, vec_score, kw_score, abstract, signed_url
         from match_proposals_with_url(
-          query_text        => $q$ {rfp.query_text} $q$,
-          query_embedding   => '{rfp.query_embedding}'::vector(1536),
-          match_count       => 3,
+          query_text          => $q$ {rfp.query_text} $q$,
+          query_embedding     => gemini_embed_vault($q$ {rfp.query_text} $q$),
+          match_count         => 3,
+          vec_weight          => 0.8,
+          kw_weight           => 0.2,
           url_expires_seconds => 3600
         );
     """
 )
 ```
 
-If Vault helpers aren't available, fall back to `match_proposals(...)` without
-`signed_url` and either (a) ship `storage_path` to the user for manual Dashboard
-access, or (b) call `public.sign_storage_url()` per-row.
+(`$q$ ... $q$` 는 Postgres dollar-quoting — RFP 본문에 작은따옴표가 있어도 안전.)
 
-(`$q$ ... $q$` is Postgres dollar-quoting — safe because RFP text may contain single quotes.)
+`vec_weight=0.8, kw_weight=0.2` 이유: `search_tsv`가 `simple` config를 사용해 한국어 형태소 분리 불가 → `kw_score` 항상 ~0 → 벡터에 더 높은 가중치.
+
+`match_proposals_with_url`이 없으면 `match_proposals(...)` 를 같은 방식으로 호출 (signed_url 생략).
 
 If fewer than 3 rows return, continue with what we have; tell the user "유사 사례 N건 발견".
 
@@ -163,7 +163,7 @@ Inspect the rendered JPGs for overflow / overlap. If a `content` slide has too m
 ## When to deviate from the default workflow
 
 - **No past proposals yet.** Skip Steps 2–3. Feed Step 4 with only the RFP + `ootb-proposal-pptx/templates/outline.example.yaml` as structural guide. Tell the user the output is a zero-shot draft — weaker than the full pipeline.
-- **RFP is actually a paragraph, not a PDF.** Skip Step 1 (prep_rfp.py). Run `embed_query.py` from `proposal-supabase-sync/scripts/` on the paragraph to get the vector, write the structured fields yourself from what the user pasted, then jump to Step 2.
+- **RFP is actually a paragraph, not a PDF.** Skip Step 1 (prep_rfp.py). Use the paragraph text directly as `rfp.query_text` in Step 2's `gemini_embed_vault()` call. Write the structured fields yourself from what the user pasted, then jump to Step 2.
 - **User wants more than 3 references.** Override `match_count => 5` or `10`. More references make synthesis richer but diminishing returns past ~5.
 - **User disagrees with the synthesis.** The outline.yaml is the source of truth — edit it directly, re-run Step 5. Don't regenerate from scratch.
 
