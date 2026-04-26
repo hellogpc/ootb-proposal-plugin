@@ -1,0 +1,42 @@
+name: Build plugin bundle
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'ootb-proposal-automation.plugin'
+      - '.github/**'
+      - 'README.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build .plugin zip
+        run: |
+          rm -f ootb-proposal-automation.plugin
+          zip -r ootb-proposal-automation.plugin . \
+            -x "*.DS_Store" \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x "*.plugin"
+          ls -lh ootb-proposal-automation.plugin
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ootb-proposal-automation.plugin
+          if git diff --cached --quiet; then
+            echo "No changes to plugin bundle."
+            exit 0
+          fi
+          git commit -m "build: rebuild plugin bundle [skip ci]"
+          git push
