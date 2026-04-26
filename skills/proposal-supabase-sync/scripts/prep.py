@@ -298,6 +298,9 @@ def main() -> int:
                          "Use this when local Gemini API is blocked.")
     ap.add_argument("--year-hint", type=int, default=None,
                     help="Year used in the Storage key path if project_year is null.")
+    ap.add_argument("--full-json", action="store_true",
+                    help="Include full row dict + embedding list in output JSON "
+                         "(used by the web-ui server for direct PostgREST upsert).")
     args = ap.parse_args()
 
     p = args.pdf.expanduser().resolve()
@@ -401,9 +404,12 @@ def main() -> int:
         "project_year": row["project_year"],
         "tags": row["tags"],
         "page_count": page_count,
-        "embedding_dim": len(embedding),
+        "embedding_dim": len(embedding) if embedding is not None else 0,
         "sql_upsert": sql,
     }
+    if args.full_json:
+        payload["row"] = row
+        payload["embedding"] = embedding  # list[float] or None if --skip-embed
 
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if args.out:
