@@ -72,7 +72,8 @@ cd skills/ootb-proposal-pptx/scripts && npm install
 
 ## 버전 이력
 
-- **0.4.0** — `web-ui` 스킬 추가. 브라우저로 문서 업로드·목록·삭제·제안서 생성 가능.
+- **0.5.0** — Env-free 운영 전환. 로컬 `.env` 불필요. Vault + Edge Function `upload-b64` + `gemini_embed_vault()` + `upload_pdf_via_vault()`로 모든 인증을 DB에서 처리. PDF 등록·검색·RFP 분석 모두 MCP만으로 동작.
+- 0.4.0 — `web-ui` 스킬 추가. 브라우저로 문서 업로드·목록·삭제·제안서 생성 가능.
 - 0.3.1 — `configure-env` TUI 마법사 추가 (rich + questionary). `prep.py` `--full-json` 플래그 추가.
 - 0.3.0 — `.env`를 사용자 config 위치로 이전. 공통 `_env.py` 리졸버 도입.
 - 0.2.0 — `configure-env` 스킬 추가
