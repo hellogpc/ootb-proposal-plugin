@@ -1,0 +1,13 @@
+{
+  "plugins": [
+    {
+      "id": "ootb-proposal-automation",
+      "name": "OOTB 제안서 자동화",
+      "description": "과거 제안서를 DB에 수집하고 RFP로부터 OOTB 브랜드 포맷 PPT 초안을 자동 생성하는 플러그인",
+      "path": ".",
+      "version": "0.4.0",
+      "author": "OOTB Lab",
+      "keywords": ["proposal", "pptx", "supabase", "gemini", "제안서", "자동화"]
+    }
+  ]
+}
