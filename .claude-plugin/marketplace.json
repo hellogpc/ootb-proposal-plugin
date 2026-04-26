@@ -11,7 +11,7 @@
         "repo": "hellogpc/ootb-proposal-plugin"
       },
       "description": "과거 제안서를 DB에 수집하고 RFP로부터 OOTB 브랜드 포맷 PPT 초안을 자동 생성하는 플러그인",
-      "version": "0.5.2",
+      "version": "0.5.3",
       "author": {
         "name": "OOTB Lab"
       },

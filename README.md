@@ -53,7 +53,8 @@ cd skills/ootb-proposal-pptx/scripts && npm install
 
 ## 버전 이력
 
-- **0.5.2** — `configure-env`/`web-ui` 스킬 제거, deprecated 스크립트 정리, 중복 `mcp_playbook.md` 통합. 로컬 `.env` 완전 불필요 (Vault 시크릿만).
+- **0.5.3** — Storage 업로드를 Edge Function `upload-binary` 직접 HTTP 방식으로 전환 (~50 MB 지원). MCP `execute_sql`의 ~3.4 MB payload 한계 우회.
+- 0.5.2 — `configure-env`/`web-ui` 스킬 제거, deprecated 스크립트 정리, 중복 `mcp_playbook.md` 통합. 로컬 `.env` 완전 불필요 (Vault 시크릿만).
 - 0.5.1 — `.plugin` 번들·GitHub Action 제거 (마켓플레이스 설치는 repo 직접 참조). 수동 설치는 GitHub Releases 사용.
 - 0.5.0 — Env-free 운영 전환. Vault + Edge Function `upload-b64` + `gemini_embed_vault()` + `upload_pdf_via_vault()`로 모든 인증을 DB에서 처리.
 - 0.4.0 — `web-ui` 스킬 추가 (이후 0.5.2에서 제거).

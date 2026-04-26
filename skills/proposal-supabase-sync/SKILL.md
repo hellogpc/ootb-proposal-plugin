@@ -78,20 +78,36 @@ longer appear in query text or `pg_stat_statements`.
 
 ## Path B — Ingest PDFs
 
-**완전 env-free**. 텍스트 추출 + base64 인코딩만 로컬에서, 나머지는 모두 MCP를 통한 SQL.
+PDF 바이너리는 **Edge Function `upload-binary`** 가 직접 받아 Storage에 저장합니다 (HTTP 본문 ~50 MB 한계). MCP `execute_sql` 의 ~3.4 MB payload 제한을 우회하기 위함. 인증/시크릿은 모두 Vault + Edge Function 환경변수에 있고, 호출 시에는 **공개해도 안전한 anon key + project URL** 만 prep.py에 전달.
 
-### Path B-1 — 텍스트 추출 + base64 (Python)
+### Path B-1 — 프로젝트 URL/anon key 가져오기
+
+매 등록 시작 시 MCP로 1회씩 조회:
+```
+mcp__supabase__get_project_url(project_id="<ref>")
+mcp__supabase__get_publishable_keys(project_id="<ref>")  # type="legacy" name="anon" 사용
+```
+얻은 값을 다음 단계 prep.py 호출에 CLI 인자로 전달.
+
+### Path B-2 — 텍스트 추출 + 업로드 (Python)
 
 ```bash
 cd scripts
-python prep.py /abs/path/to/file.pdf --out /tmp/prep.json
+python prep.py /abs/path/to/file.pdf \
+  --project-url https://<ref>.supabase.co \
+  --anon-key <anon_or_publishable_key> \
+  --out /tmp/prep.json
 ```
 
-출력: `{file_hash, file_name, file_size, page_count, storage_bucket, storage_path, full_text, pdf_b64}`
+prep.py가 하는 일:
+- SHA-256 해시 (중복 방지)
+- `pdfplumber`로 텍스트 추출
+- Edge Function `upload-binary`에 PDF 바이너리 직접 POST (Storage 업로드)
+- 출력: `{file_hash, file_name, file_size, page_count, storage_bucket, storage_path, uploaded_bytes, full_text}`
 
-`pdf_b64`는 PDF 바이트의 base64 문자열. PDF 원본 보관이 불필요하면 `--no-b64` 추가 (storage_path가 null로 남고 Storage 업로드 단계 생략).
+> Storage 보관이 불필요하면 `--no-upload` 추가 (storage_path가 null로 남음).
 
-### Path B-2 — 구조화 추출 (Claude)
+### Path B-3 — 구조화 추출 (Claude)
 
 `/tmp/prep.json`의 `full_text`를 읽고, 아래 스키마에 맞춰 메타데이터를 추출:
 
@@ -113,22 +129,6 @@ tags             string[]         검색 키워드 5~12개
 ```
 
 확실하지 않은 필드는 null. 추측 금지.
-
-### Path B-3 — Storage 업로드 (MCP, pdf_b64 있을 때만)
-
-`pdf_b64`가 있으면 먼저 Storage에 올립니다 (한 번의 SQL 호출):
-
-```sql
-select public.upload_pdf_via_vault(
-  '<storage_path>',
-  $b64$<pdf_b64>$b64$,
-  'proposals'
-);
-```
-
-`upload_pdf_via_vault()`가 Vault에서 service role 키를 읽어 `upload-b64` Edge Function을 호출 → Edge Function이 base64 디코드 후 Storage에 PUT.
-
-> **크기 주의**: base64 문자열이 SQL 본문에 포함되므로 한 PDF가 ~10MB 이내에서 안정적. 더 큰 파일은 `--no-b64`로 등록 후 Supabase Dashboard에서 직접 업로드.
 
 ### Path B-4 — DB 업서트 (MCP)
 
@@ -218,10 +218,11 @@ Prefer `execute_sql` with small explicit `select` over pulling whole rows.
 - `sql/001_init.sql` — full schema bootstrap, feed into `apply_migration` on first use.
 - `sql/002_embed_in_db.sql` — installs `http` extension + `gemini_embed(text, key)` (prereq for 003).
 - `sql/003_vault_helpers.sql` — `gemini_embed_vault()`, `sign_storage_url()`, `match_proposals_with_url()`.
-- `sql/004_upload_via_vault.sql` — `upload_pdf_via_vault(path, b64)` for env-free Storage upload.
-- `scripts/prep.py` — local PDF → text + base64 → JSON. No Gemini, no SUPABASE creds.
+- `sql/004_upload_via_vault.sql` — legacy SQL-based base64 upload (≤2 MB). Kept for reference; current default is HTTP upload via `upload-binary`.
+- `scripts/prep.py` — local PDF → text extraction + HTTP POST to `upload-binary` Edge Function. No Gemini, no SUPABASE creds beyond public anon key.
 - `scripts/requirements.txt` — `pdfplumber`, `python-dotenv`, `requests`.
-- `edge-functions/upload-b64/index.ts` — Edge Function that decodes base64 + writes to Storage.
+- `edge-functions/upload-binary/index.ts` — **primary** Edge Function (raw PDF body, ≤50 MB).
+- `edge-functions/upload-b64/index.ts` — legacy base64 Edge Function (used by `upload_pdf_via_vault` SQL fn).
 - `mcp_playbook.md` — exact MCP call parameters for each Path.
 
 ## Design notes
