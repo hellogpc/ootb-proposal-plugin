@@ -9,3 +9,6 @@ node_modules/
 *.pptx
 *.pdf
 /tmp/
+
+# Plugin bundle is built on demand (manual install or Releases), not committed
+ootb-proposal-automation.plugin
