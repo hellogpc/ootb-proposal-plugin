@@ -7,7 +7,9 @@ description: "MUST USE for OOTB proposal DB tasks. Ingests 제안서 PDFs into S
 
 This skill ingests 제안서 PDFs into Supabase and searches them, delegating all DB work to the **Supabase MCP server**. The user does **not** run DB scripts — Claude performs DB operations directly via MCP tools.
 
-Local Python does only what MCP can't: PDF text extraction, Gemini structured extraction, Gemini embedding, and binary Storage upload over HTTP (since MCP's JSON-RPC can't stream binary).
+**Env-free 운영**: 로컬에 `GEMINI_API_KEY` / `SUPABASE_URL` / `SERVICE_ROLE_KEY` 불필요. 모든 인증은 Supabase Vault에 있고, Storage 업로드는 base64로 인코딩한 PDF를 MCP `execute_sql` 한 번에 보내 DB가 Edge Function을 호출하는 방식으로 처리합니다.
+
+Local Python은 MCP가 못 하는 것만: PDF 텍스트 추출 + base64 인코딩.
 
 ## When to use
 
@@ -19,13 +21,15 @@ If the Supabase MCP is not connected, stop and call `suggest_connectors` for Sup
 
 ## Prerequisites
 
-1. **Supabase MCP connected** in Cowork/Claude Desktop (check via `/mcp` or Cowork settings). The MCP tools appear under the `supabase` namespace (`apply_migration`, `execute_sql`, `list_tables`, `list_projects`, etc.).
-2. **.env filled in** at `scripts/.env`:
-   - `GEMINI_API_KEY` (always required)
-   - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (required only if uploading PDF originals to Storage — which is the default)
-3. **Python deps**: `pip install -r scripts/requirements.txt`
+1. **Supabase MCP connected** in Cowork/Claude Desktop (`/mcp` 또는 Cowork 설정에서 확인). MCP 도구가 `supabase` 네임스페이스에 노출됨 (`apply_migration`, `execute_sql`, `list_tables` 등).
+2. **Vault에 시크릿 등록** (1회):
+   - `gemini_api_key` — 임베딩 생성용
+   - `supabase_service_role_key` — signed URL + Storage 업로드용
+3. **Edge Function `upload-b64` 배포** (1회): `edge-functions/upload-b64/index.ts` → `mcp__supabase__deploy_edge_function`
+4. **SQL 함수 적용** (1회): `sql/003_vault_helpers.sql` + `sql/004_upload_via_vault.sql`
+5. **Python deps**: `pip install -r scripts/requirements.txt`
 
-Claude: if any of these are missing, stop and ask the user to fix them before proceeding.
+위 5가지가 끝나면 로컬 `.env` 없이 동작합니다.
 
 ## Path A — First-time DB setup (apply migration)
 
@@ -74,20 +78,18 @@ longer appear in query text or `pg_stat_statements`.
 
 ## Path B — Ingest PDFs
 
-`GEMINI_API_KEY` 는 로컬에 불필요합니다. 텍스트 추출은 `prep.py`(Python), 구조화 추출은 Claude, 임베딩은 DB 내 `gemini_embed_vault()`가 담당합니다.
+**완전 env-free**. 텍스트 추출 + base64 인코딩만 로컬에서, 나머지는 모두 MCP를 통한 SQL.
 
-### Path B-1 — 텍스트 추출 (Python)
+### Path B-1 — 텍스트 추출 + base64 (Python)
 
 ```bash
 cd scripts
 python prep.py /abs/path/to/file.pdf --out /tmp/prep.json
 ```
 
-`prep.py`가 하는 일:
-- SHA-256 해시 (중복 방지)
-- `pdfplumber`로 텍스트 추출
-- (기본) Supabase Storage에 PDF 업로드 (`SUPABASE_SERVICE_ROLE_KEY` 필요)
-- 출력: `{file_hash, file_name, file_size, page_count, storage_bucket, storage_path, full_text}`
+출력: `{file_hash, file_name, file_size, page_count, storage_bucket, storage_path, full_text, pdf_b64}`
+
+`pdf_b64`는 PDF 바이트의 base64 문자열. PDF 원본 보관이 불필요하면 `--no-b64` 추가 (storage_path가 null로 남고 Storage 업로드 단계 생략).
 
 ### Path B-2 — 구조화 추출 (Claude)
 
@@ -112,7 +114,23 @@ tags             string[]         검색 키워드 5~12개
 
 확실하지 않은 필드는 null. 추측 금지.
 
-### Path B-3 — DB 업서트 (MCP)
+### Path B-3 — Storage 업로드 (MCP, pdf_b64 있을 때만)
+
+`pdf_b64`가 있으면 먼저 Storage에 올립니다 (한 번의 SQL 호출):
+
+```sql
+select public.upload_pdf_via_vault(
+  '<storage_path>',
+  $b64$<pdf_b64>$b64$,
+  'proposals'
+);
+```
+
+`upload_pdf_via_vault()`가 Vault에서 service role 키를 읽어 `upload-b64` Edge Function을 호출 → Edge Function이 base64 디코드 후 Storage에 PUT.
+
+> **크기 주의**: base64 문자열이 SQL 본문에 포함되므로 한 PDF가 ~10MB 이내에서 안정적. 더 큰 파일은 `--no-b64`로 등록 후 Supabase Dashboard에서 직접 업로드.
+
+### Path B-4 — DB 업서트 (MCP)
 
 추출한 메타데이터와 prep.json 파일 정보를 조합해 아래 SQL을 빌드하고 MCP로 실행:
 
