@@ -16,7 +16,7 @@ Claude is the synthesis engine in the middle. `prep_rfp.py` handles PDF text ext
 
 - Supabase MCP is connected (look for `mcp__supabase__execute_sql` availability).
 - `proposals` table exists and has ≥ 1 ingested past proposal (ask: "DB에 과거 제안서가 몇 건 있나요?" → run `select count(*) from proposals;`).
-- Supabase Vault에 `gemini_api_key` 시크릿이 등록되어 있음 (로컬 `GEMINI_API_KEY` 불필요).
+- Supabase Edge Function `embed` 가 배포되어 있고 환경변수 `GEMINI_API_KEY` 가 등록되어 있음 (Project Settings → Functions → Secrets). 로컬 `GEMINI_API_KEY` 불필요.
 - `ootb-proposal-pptx/scripts/` requirements installed.
 
 If none of the above, stop and direct the user to the relevant skill first.

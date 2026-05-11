@@ -14,13 +14,16 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 
 ### Step 1 — 상태 수집
 
-실행 전 두 가지를 조용히 확인 (Supabase MCP 사용):
+실행 전 세 가지를 조용히 확인 (Supabase MCP 사용):
 
-1. **Vault 시크릿**:  
-   `select name from vault.decrypted_secrets where name in ('gemini_api_key','supabase_service_role_key');`  
-   → 두 시크릿 존재 여부 확인. MCP 미연결이면 "➖ MCP 미연결".
+1. **Edge Functions 배포 상태**:  
+   `mcp__supabase__list_edge_functions(project_id=...)` → `upload-binary`, `embed`, `sign-url` 3개 모두 `status=ACTIVE` 인지.
 
-2. **DB 문서 수**:  
+2. **임베딩 함수 동작 확인** (Edge Function 환경변수 정상 여부):  
+   `select octet_length(gemini_embed_vault('ping')::text) > 0 as ok;`  
+   → 에러 없으면 ✅. `GEMINI_API_KEY env var not set` 에러 나면 ❌.
+
+3. **DB 문서 수**:  
    `select count(*) from proposals;`  
    MCP 연결 안 됐으면 "—" 표시.
 
@@ -34,7 +37,8 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 
 | | 항목 | 상태 |
 |:---:|---|---|
-| 🔐 | Vault 시크릿 | ✅ 등록됨 / ❌ 미등록 / ➖ MCP 미연결 |
+| ⚡ | Edge Functions | ✅ 3/3 ACTIVE / ❌ 누락 / ➖ MCP 미연결 |
+| 🔐 | Function Secrets | ✅ 정상 / ❌ GEMINI_API_KEY 등 미설정 / ➖ 확인불가 |
 | 🗄️ | DB 연결 | ✅ 연결됨 / ❌ 미연결 / ➖ MCP 미연결 |
 | 📁 | 등록 제안서 | **N건** / — |
 
@@ -51,11 +55,10 @@ description: "MUST USE as the main entry point for OOTB proposal automation. Sho
 ---
 ```
 
-> Vault 시크릿이 미등록이면 메뉴 아래에 안내 추가:
-> ```sql
-> select vault.create_secret('<GEMINI_API_KEY>', 'gemini_api_key', 'Gemini embed');
-> select vault.create_secret('<SERVICE_ROLE_KEY>', 'supabase_service_role_key', 'Storage');
-> ```
+> Function Secrets가 미설정이면 메뉴 아래에 안내 추가:
+> Supabase Dashboard → Project Settings → Functions → Secrets 에서 등록:
+> - `GEMINI_API_KEY` (Gemini 임베딩용)
+> - `SERVICE_ROLE_KEY` (Storage signed URL용)
 
 ### Step 3 — AskUserQuestion으로 메뉴 선택
 

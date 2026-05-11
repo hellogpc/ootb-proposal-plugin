@@ -23,20 +23,20 @@ Claude Cowork 에 설치해 과거 제안서를 DB 에 쌓고, 새 RFP/과업지
                  ▼                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                          Supabase                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐     │
-│  │  Postgres    │  │ Edge Function│  │      Vault          │     │
-│  │  proposals   │  │ upload-binary│  │ • gemini_api_key    │     │
-│  │  (pgvector)  │  │   (~50MB)    │  │ • service_role_key  │     │
-│  └──────┬───────┘  └──────┬───────┘  └─────────┬──────────┘     │
-│         │                  │                    │                │
-│         │   ┌──────────────┴────────────────────┘                │
-│         ▼   ▼                                                    │
+│  ┌──────────────┐  ┌──────────────────────────────────────────┐  │
+│  │  Postgres    │  │  Edge Functions                          │  │
+│  │  proposals   │  │  • upload-binary (~50MB PDF)             │  │
+│  │  (pgvector)  │  │  • embed         (GEMINI_API_KEY env)    │  │
+│  └──────┬───────┘  │  • sign-url      (SERVICE_ROLE_KEY env)  │  │
+│         │          └──────┬───────────────────────────────────┘  │
+│         │                 │                                       │
+│         ▼                 ▼                                       │
 │  ┌──────────────┐                                                │
-│  │   Storage    │  ← Edge Function이 Vault 키로 직접 PUT          │
+│  │   Storage    │  ← upload-binary 이 Storage에 직접 PUT          │
 │  │   proposals/ │                                                │
 │  └──────────────┘                                                │
 │                                                                  │
-│  Gemini API ◀── gemini_embed_vault(text) — DB가 Vault 키로 호출    │
+│  Gemini API ◀── embed Edge Function — GEMINI_API_KEY env로 호출    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,7 +109,7 @@ RFP PDF
    cd skills/ootb-proposal-pptx/scripts && npm install
    ```
 
-> ✅ **로컬 `.env` 불필요** — 모든 인증은 Supabase Vault에 보관됨
+> ✅ **로컬 `.env` 불필요** — 모든 시크릿은 Supabase Edge Function 환경변수에 보관됨
 
 ## 일상 사용
 
@@ -123,7 +123,7 @@ Cowork 채팅창에서 한 마디:
 | 제안서 초안 생성 | `"이 RFP로 제안서 만들어줘"` + 파일 첨부 |
 | 등록 현황 | `"DB에 몇 건 있지?"` |
 
-대시보드가 상태 카드(Vault 시크릿 / DB 연결 / 등록 건수)를 표시한 후, 메뉴 선택으로 진행합니다.
+대시보드가 상태 카드(Edge Functions / Function Secrets / DB 연결 / 등록 건수)를 표시한 후, 메뉴 선택으로 진행합니다.
 
 ## 디렉터리
 
@@ -146,7 +146,7 @@ ootb-proposal-plugin/
 
 | 원칙 | 구현 |
 |---|---|
-| **시크릿은 DB에만** | Gemini·service role 키 모두 Supabase Vault. 로컬·git에 평문 키 없음 |
+| **시크릿은 서버에만** | Gemini·service role 키 모두 Supabase Edge Function Secrets. 로컬·git에 평문 키 없음 |
 | **MCP가 메인 채널** | Claude ↔ DB 통신은 모두 `execute_sql` |
 | **바이너리는 HTTP로** | PDF는 Edge Function 직접 POST (~50MB). MCP의 3.4MB 한계 우회 |
 | **임베딩은 DB-side** | `gemini_embed_vault(text)` 한 줄. 로컬 Gemini 호출 없음 |
@@ -154,8 +154,8 @@ ootb-proposal-plugin/
 
 ## 외부 의존성
 
-- **Supabase** — Postgres + pgvector + Storage + Vault + Edge Functions (MCP)
-- **Google Gemini** — Embedding (1536-d). API 키는 Vault
+- **Supabase** — Postgres + pgvector + Storage + Edge Functions (MCP)
+- **Google Gemini** — Embedding (1536-d). API 키는 Edge Function Secrets
 - **pptxgenjs** — 플러그인 내 `npm install`
 - **LibreOffice + poppler** (선택) — QA 용
 

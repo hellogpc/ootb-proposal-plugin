@@ -1,13 +1,13 @@
 ---
 name: proposal-supabase-sync
-description: "MUST USE for OOTB proposal DB tasks. Ingests 제안서 PDFs into Supabase `proposals` table and runs hybrid (vector + keyword + metadata) search via Supabase MCP. Triggers: (a) REGISTER — '이 PDF 등록해줘', 'DB에 넣어줘', '제안서 수집', 'PDF 쌓아줘'; (b) SEARCH — '복지로 관련 제안서', '수산 관련 제안서', '과거 제안서 검색', '제안서 몇 건 있어', '태그 통계'; (c) FIRST SETUP — 'DB 처음 셋업', 'proposals 테이블 만들어줘', 'Vault helper'. Requires Supabase MCP connected. Do NOT use for non-proposal documents."
+description: "MUST USE for OOTB proposal DB tasks. Ingests 제안서 PDFs into Supabase `proposals` table and runs hybrid (vector + keyword + metadata) search via Supabase MCP. Triggers: (a) REGISTER — '이 PDF 등록해줘', 'DB에 넣어줘', '제안서 수집', 'PDF 쌓아줘'; (b) SEARCH — '복지로 관련 제안서', '수산 관련 제안서', '과거 제안서 검색', '제안서 몇 건 있어', '태그 통계'; (c) FIRST SETUP — 'DB 처음 셋업', 'proposals 테이블 만들어줘', 'Edge Function 설정'. Requires Supabase MCP connected. Do NOT use for non-proposal documents."
 ---
 
 # Proposal ↔ Supabase Sync (MCP edition)
 
 This skill ingests 제안서 PDFs into Supabase and searches them, delegating all DB work to the **Supabase MCP server**. The user does **not** run DB scripts — Claude performs DB operations directly via MCP tools.
 
-**Env-free 운영**: 로컬에 `GEMINI_API_KEY` / `SUPABASE_URL` / `SERVICE_ROLE_KEY` 불필요. 모든 인증은 Supabase Vault에 있고, Storage 업로드는 base64로 인코딩한 PDF를 MCP `execute_sql` 한 번에 보내 DB가 Edge Function을 호출하는 방식으로 처리합니다.
+**Env-free 운영**: 로컬에 `GEMINI_API_KEY` / `SUPABASE_URL` / `SERVICE_ROLE_KEY` 불필요. 모든 시크릿은 Supabase **Edge Function Secrets** (Project Settings → Functions → Secrets) 에 있고, SQL 함수가 Edge Function을 호출해 사용합니다. PDF 업로드는 prep.py가 `upload-binary` Edge Function에 직접 HTTP POST (~50MB).
 
 Local Python은 MCP가 못 하는 것만: PDF 텍스트 추출 + base64 인코딩.
 
@@ -22,11 +22,11 @@ If the Supabase MCP is not connected, stop and call `suggest_connectors` for Sup
 ## Prerequisites
 
 1. **Supabase MCP connected** in Cowork/Claude Desktop (`/mcp` 또는 Cowork 설정에서 확인). MCP 도구가 `supabase` 네임스페이스에 노출됨 (`apply_migration`, `execute_sql`, `list_tables` 등).
-2. **Vault에 시크릿 등록** (1회):
-   - `gemini_api_key` — 임베딩 생성용
-   - `supabase_service_role_key` — signed URL + Storage 업로드용
-3. **Edge Function `upload-b64` 배포** (1회): `edge-functions/upload-b64/index.ts` → `mcp__supabase__deploy_edge_function`
-4. **SQL 함수 적용** (1회): `sql/003_vault_helpers.sql` + `sql/004_upload_via_vault.sql`
+2. **Edge Function 환경변수 등록** (1회, Supabase Dashboard → Project Settings → Functions → Secrets):
+   - `GEMINI_API_KEY` — 임베딩 생성용
+   - `SERVICE_ROLE_KEY` — signed URL 생성용
+3. **Edge Function 배포** (1회): `upload-binary`, `embed`, `sign-url` 셋 다 `mcp__supabase__deploy_edge_function` 으로 배포.
+4. **SQL 마이그레이션 적용** (순서대로): `sql/001_init.sql` → `sql/002_embed_in_db.sql` → `sql/006_edge_secrets.sql` (proj_url + anon_key는 자기 프로젝트 값으로 치환).
 5. **Python deps**: `pip install -r scripts/requirements.txt`
 
 위 5가지가 끝나면 로컬 `.env` 없이 동작합니다.
@@ -53,32 +53,21 @@ extension and a `public.gemini_embed(text, key)` function that POSTs to Gemini
 from inside Postgres. **Read the security warning in that file** — the API
 key ends up in query logs; rotate the Gemini key after use or move on to A-3.
 
-### Path A-3 (strongly recommended after A-2) — Vault-based helpers
+### Path A-3 — Edge Function-backed helpers
 
-Apply `sql/003_vault_helpers.sql`. This adds three helpers that read keys from
-Supabase Vault instead of accepting them as parameters:
+Apply `sql/003_vault_helpers.sql` (for `match_proposals_with_url`), then immediately overwrite with `sql/006_edge_secrets.sql` which redefines `gemini_embed_vault`/`sign_storage_url` to call Edge Functions instead of reading Supabase Vault.
 
-- `public.gemini_embed_vault(text) → vector(1536)` — replaces the parametric
-  `gemini_embed(text, key)` in day-to-day use.
-- `public.sign_storage_url(bucket, path, expires_seconds) → text` — returns a
-  fresh signed URL for a Storage object.
-- `public.match_proposals_with_url(...)` — same args as `match_proposals` plus
-  `url_expires_seconds`; returns an additional `signed_url` column per row
-  (null for rows whose `storage_path` is still a `file://` placeholder).
+함수 구성:
 
-One-time Vault setup (run once in SQL editor or via `execute_sql`):
+- `public.gemini_embed_vault(text) → vector(1536)` — `embed` Edge Function 호출 (env var `GEMINI_API_KEY` 사용).
+- `public.sign_storage_url(bucket, path, expires_seconds) → text` — `sign-url` Edge Function 호출 (env var `SERVICE_ROLE_KEY` 사용).
+- `public.match_proposals_with_url(...)` — `match_proposals` 결과에 signed_url 컬럼 추가.
 
-```sql
-select vault.create_secret('<GEMINI_API_KEY>', 'gemini_api_key', 'Gemini embed');
-select vault.create_secret('<SERVICE_ROLE_KEY>', 'supabase_service_role_key', 'Sign URL');
-```
-
-After this, every subsequent SQL call uses these secrets silently; keys no
-longer appear in query text or `pg_stat_statements`.
+> Edge Function 환경변수는 Supabase Dashboard → Project Settings → Functions → Secrets에서 등록. SQL 함수 안에는 시크릿이 들어가지 않습니다.
 
 ## Path B — Ingest PDFs
 
-PDF 바이너리는 **Edge Function `upload-binary`** 가 직접 받아 Storage에 저장합니다 (HTTP 본문 ~50 MB 한계). MCP `execute_sql` 의 ~3.4 MB payload 제한을 우회하기 위함. 인증/시크릿은 모두 Vault + Edge Function 환경변수에 있고, 호출 시에는 **공개해도 안전한 anon key + project URL** 만 prep.py에 전달.
+PDF 바이너리는 **Edge Function `upload-binary`** 가 직접 받아 Storage에 저장합니다 (HTTP 본문 ~50 MB 한계). MCP `execute_sql` 의 ~3.4 MB payload 제한을 우회하기 위함. Service role은 Edge Function 환경변수에 있고, 호출 시에는 **공개해도 안전한 anon key + project URL** 만 prep.py에 전달.
 
 ### Path B-1 — 프로젝트 URL/anon key 가져오기
 
@@ -172,7 +161,7 @@ returning id, title, project_year;
 
 ## Path C — Search
 
-`gemini_embed_vault()` DB 함수가 Supabase Vault에서 Gemini API 키를 읽어 임베딩을 생성합니다. 로컬 Python 실행 없이 MCP SQL 한 번으로 검색 완료.
+`gemini_embed_vault()` SQL 함수가 `embed` Edge Function을 호출해 임베딩을 생성합니다 (Edge Function이 `GEMINI_API_KEY` 환경변수 사용). 로컬 Python 실행 없이 MCP SQL 한 번으로 검색 완료.
 
 ### C-1 Hybrid 검색 (기본)
 
@@ -227,13 +216,14 @@ Prefer `execute_sql` with small explicit `select` over pulling whole rows.
 
 ## Design notes
 
-- **All credentials live in Supabase Vault.** Local Python doesn't need `GEMINI_API_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The DB-side functions (`gemini_embed_vault`, `upload_pdf_via_vault`) read keys from `vault.decrypted_secrets`.
-- **Binary upload via base64 + Edge Function.** PDFs travel as base64 inside an MCP `execute_sql` call → DB calls the `upload-b64` Edge Function → Edge Function decodes and writes to Storage. Keep PDFs under ~10 MB to stay safe with SQL body limits.
+- **All credentials live in Edge Function Secrets.** 로컬 Python은 어떤 시크릿도 필요 없음. SQL 함수 (`gemini_embed_vault`, `sign_storage_url`) 가 Edge Function (`embed`, `sign-url`) 을 호출하면 Edge Function의 환경변수 (`GEMINI_API_KEY`, `SERVICE_ROLE_KEY`) 가 사용됨. SQL 로그/`pg_stat_statements`에 시크릿이 남지 않음.
+- **Binary upload via direct HTTP.** PDF는 prep.py가 `upload-binary` Edge Function에 raw body로 직접 POST. ~50MB 까지 안정적.
 - **Idempotent by `file_hash`.** Same PDF uploaded twice just UPDATEs the row. Different content = different hash = new row.
 
 ## Common failure modes
 
 - **"ERROR: relation proposals does not exist"** — Path A wasn't run. Run it.
 - **"auth error" from MCP** — Supabase MCP OAuth session expired. Tell user to reconnect in Cowork settings.
-- **"gemini_api_key secret not set in vault"** — Run `select vault.create_secret('<KEY>', 'gemini_api_key', 'Gemini embed');`.
-- **Storage upload 413 Payload Too Large** — PDF too large for SQL body. Use Supabase Dashboard direct upload then PATCH `storage_path`.
+- **"GEMINI_API_KEY env var not set"** — Edge Function `embed` 의 환경변수 미설정. Supabase Dashboard → Functions → Secrets에서 `GEMINI_API_KEY` 등록.
+- **"SERVICE_ROLE_KEY env var not set"** — Edge Function `sign-url` 의 환경변수 미설정. Dashboard에서 `SERVICE_ROLE_KEY` 등록.
+- **Edge Function 413 Payload Too Large** — PDF가 ~50MB 초과. Supabase Dashboard에서 직접 업로드 후 `storage_path` PATCH.
