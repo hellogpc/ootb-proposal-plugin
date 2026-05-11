@@ -81,21 +81,20 @@ RFP PDF
 
 ### 1단계 — Supabase 준비 (관리자가 1회)
 
-**Vault 시크릿 등록** (Supabase SQL 에디터 또는 MCP `execute_sql`):
-```sql
-select vault.create_secret('<GEMINI_API_KEY>',  'gemini_api_key',         'Gemini embed');
-select vault.create_secret('<SERVICE_ROLE_KEY>','supabase_service_role_key','Storage upload');
-```
+**Edge Function 환경변수 등록** (Supabase Dashboard → Project Settings → Functions → Secrets):
+- `GEMINI_API_KEY` — Gemini 임베딩용 ([Google AI Studio](https://aistudio.google.com/app/apikey) 발급)
+- `SERVICE_ROLE_KEY` — Storage signed URL 생성용 (Project Settings → API → `service_role` 키)
 
 **스키마 + 함수 적용** (`apply_migration` 으로 순서대로):
 - `sql/001_init.sql` — `proposals` 테이블 + `match_proposals` RPC
-- `sql/002_embed_in_db.sql` — `http` 확장 + `gemini_embed(text, key)`
-- `sql/003_vault_helpers.sql` — `gemini_embed_vault`, `sign_storage_url`, `match_proposals_with_url`
-- `sql/004_upload_via_vault.sql` — (legacy 보조)
+- `sql/002_embed_in_db.sql` — `http` 확장
+- `sql/003_vault_helpers.sql` — `match_proposals_with_url` 등 (006이 일부 함수 overwrite)
+- `sql/006_edge_secrets.sql` — `gemini_embed_vault`/`sign_storage_url` (Edge Function 호출 방식). proj_url + anon_key를 자기 프로젝트에 맞게 수정 후 적용.
 
-**Edge Functions 배포**:
-- `edge-functions/upload-binary/` ← 메인 (HTTP 바이너리, ~50MB)
-- `edge-functions/upload-b64/`    ← 보조 (base64, ~10MB)
+**Edge Functions 배포** (3개):
+- `edge-functions/upload-binary/` — PDF 바이너리 업로드 (~50MB)
+- `edge-functions/embed/` — Gemini 임베딩 (GEMINI_API_KEY 사용)
+- `edge-functions/sign-url/` — Storage signed URL (SERVICE_ROLE_KEY 사용)
 
 ### 2단계 — 팀원 PC (각자 1회)
 
@@ -162,7 +161,8 @@ ootb-proposal-plugin/
 
 ## 버전 이력
 
-- **0.5.3** — Storage 업로드를 Edge Function `upload-binary` 직접 HTTP 방식으로 전환 (~50 MB 지원). MCP `execute_sql`의 ~3.4 MB payload 한계 우회.
+- **0.5.4** — Vault 의존성 제거. 시크릿을 **Edge Function 환경변수**(`GEMINI_API_KEY`, `SERVICE_ROLE_KEY`)로 관리. 신규 Edge Function `embed`/`sign-url` + SQL 마이그레이션 `006_edge_secrets.sql`. SQL `gemini_embed_vault`/`sign_storage_url`은 이제 Edge Function을 호출.
+- 0.5.3 — Storage 업로드를 Edge Function `upload-binary` 직접 HTTP 방식으로 전환 (~50 MB 지원). MCP `execute_sql`의 ~3.4 MB payload 한계 우회.
 - 0.5.2 — `configure-env`/`web-ui` 스킬 제거, deprecated 스크립트 정리. 로컬 `.env` 완전 불필요.
 - 0.5.1 — `.plugin` 번들·GitHub Action 제거 (마켓플레이스 설치는 repo 직접 참조).
 - 0.5.0 — Env-free 운영 전환. Vault + Edge Function `upload-b64` + `gemini_embed_vault()`.
