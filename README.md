@@ -161,7 +161,8 @@ ootb-proposal-plugin/
 
 ## 버전 이력
 
-- **0.5.4** — Vault 의존성 제거. 시크릿을 **Edge Function 환경변수**(`GEMINI_API_KEY`, `SERVICE_ROLE_KEY`)로 관리. 신규 Edge Function `embed`/`sign-url` + SQL 마이그레이션 `006_edge_secrets.sql`. SQL `gemini_embed_vault`/`sign_storage_url`은 이제 Edge Function을 호출.
+- **0.5.5** — Vault 관련 가이드 잔재 정리. SKILL.md/README 전반에서 `vault.create_secret` 안내 제거하고 "Project Settings → Functions → Secrets" 가이드로 통일.
+- 0.5.4 — Vault 의존성 제거. 시크릿을 **Edge Function 환경변수**(`GEMINI_API_KEY`, `SERVICE_ROLE_KEY`)로 관리. 신규 Edge Function `embed`/`sign-url` + SQL 마이그레이션 `006_edge_secrets.sql`. SQL `gemini_embed_vault`/`sign_storage_url`은 이제 Edge Function을 호출.
 - 0.5.3 — Storage 업로드를 Edge Function `upload-binary` 직접 HTTP 방식으로 전환 (~50 MB 지원). MCP `execute_sql`의 ~3.4 MB payload 한계 우회.
 - 0.5.2 — `configure-env`/`web-ui` 스킬 제거, deprecated 스크립트 정리. 로컬 `.env` 완전 불필요.
 - 0.5.1 — `.plugin` 번들·GitHub Action 제거 (마켓플레이스 설치는 repo 직접 참조).
