@@ -34,7 +34,26 @@ function parseArgs() {
 }
 
 // ---------- Helpers ----------
-function hex(c)     { return (c || "000000").replace(/^#/, ""); }
+// hex(): palette 값을 6자리 HEX로 정규화. 값이 없으면 경고 + 검은색 fallback.
+// key를 함께 넘기면 어떤 키가 빠졌는지 stderr에 로그됨.
+function hex(c, key) {
+  if (c === undefined || c === null) {
+    if (key) console.warn(`[WARN] palette.${key} 미정의 → #000000 fallback`);
+    return "000000";
+  }
+  return String(c).replace(/^#/, "");
+}
+
+// sz(): sizes_pt 값을 안전하게 읽기. 없으면 fallback + 경고.
+function sz(brand, key, fallback) {
+  const v = brand.sizes_pt && brand.sizes_pt[key];
+  if (v === undefined || v === null) {
+    console.warn(`[WARN] sizes_pt.${key} 미정의 → ${fallback}pt fallback`);
+    return fallback;
+  }
+  return v;
+}
+
 function assetPath(brand, filename) {
   if (!brand.assets_dir) return null;
   const p = path.join(brand.assets_dir, filename);
@@ -66,7 +85,7 @@ const H = 7.5;
 
 function addCover(slide, f, brand) {
   const P = brand.palette;
-  slide.background = { color: hex(P.navy_deep) };
+  slide.background = { color: hex(P.navy_deep, "navy_deep") };
 
   const bg = (f.background)
     ? (path.isAbsolute(f.background) ? f.background
@@ -79,30 +98,30 @@ function addCover(slide, f, brand) {
   // Accent parallelogram bar
   slide.addShape("parallelogram", {
     x: -1.0, y: 1.2, w: 7.0, h: 0.12,
-    fill: { color: hex(P.blue) },
+    fill: { color: hex(P.blue, "blue") },
     line: { type: "none" },
   });
 
   slide.addText(f.title || "", koText(brand, {
     x: 1.2, y: 2.4, w: 11.0, h: 2.4,
-    fontSize: brand.sizes_pt.cover_title,
-    bold: true, color: hex(P.white),
+    fontSize: sz(brand, "cover_title", 48),
+    bold: true, color: hex(P.white, "white"),
     align: "center", valign: "middle", margin: 0,
   }));
 
   if (f.date) {
     slide.addText(f.date, koText(brand, {
       x: 1.2, y: 5.8, w: 11.0, h: 0.4,
-      fontSize: brand.sizes_pt.cover_date,
-      color: hex(P.white), align: "center", margin: 0,
+      fontSize: sz(brand, "cover_date", 14),
+      color: hex(P.white, "white"), align: "center", margin: 0,
     }));
   }
 
   if (f.company) {
     slide.addText(f.company, koText(brand, {
       x: 1.2, y: 6.3, w: 11.0, h: 0.4,
-      fontSize: brand.sizes_pt.cover_company,
-      bold: true, color: hex(P.blue_light), align: "center", margin: 0,
+      fontSize: sz(brand, "cover_company", 14),
+      bold: true, color: hex(P.blue_light, "blue_light"), align: "center", margin: 0,
     }));
   }
 
@@ -112,12 +131,12 @@ function addCover(slide, f, brand) {
 
 function addTOC(slide, f, brand) {
   const P = brand.palette;
-  slide.background = { color: hex(P.bg_light) };
+  slide.background = { color: hex(P.bg_light, "bg_light") };
 
   slide.addText("Index", koText(brand, {
     x: 1.5, y: 1.2, w: 3.5, h: 1.2,
-    fontSize: brand.sizes_pt.toc_label,
-    bold: true, color: hex(P.blue),
+    fontSize: sz(brand, "toc_label", 48),
+    bold: true, color: hex(P.blue, "blue"),
     align: "center", valign: "middle", margin: 0,
   }));
 
@@ -130,19 +149,19 @@ function addTOC(slide, f, brand) {
     const y = START_Y + (ROW_H + GAP) * i;
     slide.addShape("roundRect", {
       x: 5.8, y, w: 0.9, h: ROW_H,
-      fill: { color: hex(P.blue) }, line: { type: "none" },
+      fill: { color: hex(P.blue, "blue") }, line: { type: "none" },
       rectRadius: 0.15,
     });
     slide.addText(String(i + 1).padStart(2, "0"), koText(brand, {
       x: 5.8, y, w: 0.9, h: ROW_H,
-      fontSize: brand.sizes_pt.toc_num,
-      bold: true, color: hex(P.white),
+      fontSize: sz(brand, "toc_num", 18),
+      bold: true, color: hex(P.white, "white"),
       align: "center", valign: "middle", margin: 0,
     }));
     slide.addText(items[i], koText(brand, {
       x: 7.2, y, w: 5.5, h: ROW_H,
-      fontSize: brand.sizes_pt.toc_item,
-      bold: true, color: hex(P.navy_deep),
+      fontSize: sz(brand, "toc_item", 22),
+      bold: true, color: hex(P.navy_deep, "navy_deep"),
       align: "left", valign: "middle", margin: 0,
     }));
   }
@@ -152,7 +171,7 @@ function addTOC(slide, f, brand) {
 
 function addSectionDivider(slide, f, brand) {
   const P = brand.palette;
-  slide.background = { color: hex(P.navy_deep) };
+  slide.background = { color: hex(P.navy_deep, "navy_deep") };
 
   const bg = assetPath(brand, "section_bg.jpg");
   if (bg) slide.addImage({ path: bg, x: 0, y: 0, w: W, h: H });
@@ -160,41 +179,41 @@ function addSectionDivider(slide, f, brand) {
   if (f.number) {
     slide.addText(String(f.number), koText(brand, {
       x: 0, y: 2.3, w: W, h: 1.5,
-      fontSize: brand.sizes_pt.section_num,
-      bold: true, color: hex(P.blue_light),
+      fontSize: sz(brand, "section_num", 54),
+      bold: true, color: hex(P.blue_light, "blue_light"),
       align: "center", valign: "middle", margin: 0,
     }));
   }
 
   slide.addShape("rect", {
     x: (W - 0.6) / 2, y: 3.5, w: 0.6, h: 0.04,
-    fill: { color: hex(P.blue) }, line: { type: "none" },
+    fill: { color: hex(P.blue, "blue") }, line: { type: "none" },
   });
 
   slide.addText(f.title || "", koText(brand, {
     x: 0, y: 3.6, w: W, h: 1.5,
-    fontSize: brand.sizes_pt.section_title,
-    bold: true, color: hex(P.white),
+    fontSize: sz(brand, "section_title", 44),
+    bold: true, color: hex(P.white, "white"),
     align: "center", valign: "middle", margin: 0,
   }));
 }
 
 function addHero(slide, f, brand) {
   const P = brand.palette;
-  slide.background = { color: hex(P.blue_bright) };
+  slide.background = { color: hex(P.blue_bright, "blue_bright") };
 
   if (f.eyebrow) {
     slide.addText(f.eyebrow, koText(brand, {
       x: 1.0, y: 1.8, w: 11.3, h: 0.5,
-      fontSize: brand.sizes_pt.hero_eyebrow,
-      color: hex(P.blue_light), align: "center", margin: 0,
+      fontSize: sz(brand, "hero_eyebrow", 16),
+      color: hex(P.blue_light, "blue_light"), align: "center", margin: 0,
     }));
   }
 
   slide.addText(f.headline || "", koText(brand, {
     x: 1.0, y: 2.4, w: 11.3, h: 1.9,
-    fontSize: brand.sizes_pt.hero_headline,
-    bold: true, color: hex(P.white),
+    fontSize: sz(brand, "hero_headline", 72),
+    bold: true, color: hex(P.white, "white"),
     align: "center", valign: "middle", margin: 0,
   }));
 
@@ -205,15 +224,15 @@ function addHero(slide, f, brand) {
     if (hl && sub.includes(hl)) {
       const [before, after] = sub.split(hl);
       runs = [
-        { text: before, options: { color: hex(P.white) } },
-        { text: hl,     options: { color: hex(P.navy_deep), highlight: hex(P.white) } },
-        { text: after,  options: { color: hex(P.white) } },
+        { text: before, options: { color: hex(P.white, "white") } },
+        { text: hl,     options: { color: hex(P.navy_deep, "navy_deep"), highlight: hex(P.white, "white") } },
+        { text: after,  options: { color: hex(P.white, "white") } },
       ].filter(r => r.text && r.text.length > 0);
     } else {
-      runs = [{ text: sub, options: { color: hex(P.white) } }];
+      runs = [{ text: sub, options: { color: hex(P.white, "white") } }];
     }
     runs.forEach(r => { r.options = koText(brand, {
-      fontSize: brand.sizes_pt.hero_sub, bold: true, ...r.options,
+      fontSize: sz(brand, "hero_sub", 24), bold: true, ...r.options,
     }); });
     slide.addText(runs, {
       x: 1.0, y: 4.9, w: 11.3, h: 1.2,
@@ -224,20 +243,20 @@ function addHero(slide, f, brand) {
 
 function addContent(slide, f, brand) {
   const P = brand.palette, M = brand.slide.margin;
-  slide.background = { color: hex(P.bg_light) };
+  slide.background = { color: hex(P.bg_light, "bg_light") };
 
   if (f.breadcrumb) {
     slide.addText(f.breadcrumb, koText(brand, {
       x: M.left, y: 0.3, w: 8.0, h: 0.3,
-      fontSize: brand.sizes_pt.breadcrumb,
-      color: hex(P.text_muted), align: "left", margin: 0,
+      fontSize: sz(brand, "breadcrumb", 10),
+      color: hex(P.text_muted, "text_muted"), align: "left", margin: 0,
     }));
   }
 
   slide.addText(f.title || "", koText(brand, {
     x: M.left, y: 0.9, w: W - M.left - M.right, h: 1.4,
-    fontSize: brand.sizes_pt.content_title,
-    bold: true, color: hex(P.navy_deep),
+    fontSize: sz(brand, "content_title", 26),
+    bold: true, color: hex(P.navy_deep, "navy_deep"),
     align: "left", valign: "top", margin: 0,
   }));
 
@@ -246,11 +265,11 @@ function addContent(slide, f, brand) {
   const contW = W - M.left - M.right, contH = 4.2;
   slide.addShape("rect", {
     x: contX, y: contY, w: contW, h: contH,
-    fill: { color: hex(P.navy_deep) }, line: { type: "none" },
+    fill: { color: hex(P.navy_deep, "navy_deep") }, line: { type: "none" },
   });
   slide.addShape("rect", {
     x: contX, y: contY + contH - 0.05, w: contW, h: 0.05,
-    fill: { color: hex(P.blue) }, line: { type: "none" },
+    fill: { color: hex(P.blue, "blue") }, line: { type: "none" },
   });
 
   const body = (f.body || []).slice(0, 4);
@@ -278,7 +297,7 @@ function addContent(slide, f, brand) {
 
     slide.addText(`[${blk.heading || ""}]`, koText(brand, {
       x: cx, y: cy + CIRCLE_D * 0.32, w: CIRCLE_D, h: 0.45,
-      fontSize: brand.sizes_pt.flow_heading,
+      fontSize: sz(brand, "flow_heading", 16),
       bold: true, color: hex(headingColor),
       align: "center", valign: "middle", margin: 0,
     }));
@@ -286,8 +305,8 @@ function addContent(slide, f, brand) {
     slide.addText(blk.text || "", koText(brand, {
       x: contX + colW * i + 0.1, y: cy + CIRCLE_D + 0.1,
       w: colW - 0.2, h: 1.3,
-      fontSize: brand.sizes_pt.flow_body,
-      bold: true, color: hex(P.white),
+      fontSize: sz(brand, "flow_body", 12),
+      bold: true, color: hex(P.white, "white"),
       align: "center", valign: "top", margin: 0,
     }));
 
@@ -296,7 +315,7 @@ function addContent(slide, f, brand) {
       const ax2 = contX + colW * (i + 1) + (colW - CIRCLE_D) / 2 - 0.05;
       slide.addShape("line", {
         x: ax1, y: cy + CIRCLE_D / 2, w: ax2 - ax1, h: 0,
-        line: { color: hex(P.blue_light), width: 2 },
+        line: { color: hex(P.blue_light, "blue_light"), width: 2 },
       });
     }
   }
@@ -306,20 +325,20 @@ function addContent(slide, f, brand) {
 
 function addContentImage(slide, f, brand) {
   const P = brand.palette, M = brand.slide.margin;
-  slide.background = { color: hex(P.bg_light) };
+  slide.background = { color: hex(P.bg_light, "bg_light") };
 
   if (f.breadcrumb) {
     slide.addText(f.breadcrumb, koText(brand, {
       x: M.left, y: 0.3, w: 8.0, h: 0.3,
-      fontSize: brand.sizes_pt.breadcrumb,
-      color: hex(P.text_muted), align: "left", margin: 0,
+      fontSize: sz(brand, "breadcrumb", 10),
+      color: hex(P.text_muted, "text_muted"), align: "left", margin: 0,
     }));
   }
 
   slide.addText(f.title || "", koText(brand, {
     x: M.left, y: 0.9, w: W - M.left - M.right, h: 1.4,
-    fontSize: brand.sizes_pt.content_title,
-    bold: true, color: hex(P.navy_deep),
+    fontSize: sz(brand, "content_title", 26),
+    bold: true, color: hex(P.navy_deep, "navy_deep"),
     align: "left", valign: "top", margin: 0,
   }));
 
@@ -340,12 +359,12 @@ function addContentImage(slide, f, brand) {
   } else {
     slide.addShape("roundRect", {
       x: imgX, y: top, w: colW, h,
-      fill: { color: hex(P.blue_light) }, line: { type: "none" },
+      fill: { color: hex(P.blue_light, "blue_light") }, line: { type: "none" },
       rectRadius: 0.15,
     });
     slide.addText("(image)", koText(brand, {
       x: imgX, y: top, w: colW, h,
-      fontSize: 14, color: hex(P.navy),
+      fontSize: 14, color: hex(P.navy, "navy"),
       align: "center", valign: "middle", margin: 0,
     }));
   }
@@ -355,8 +374,8 @@ function addContentImage(slide, f, brand) {
   const runs = lines.map((ln, i) => ({
     text: ln,
     options: koText(brand, {
-      fontSize: brand.sizes_pt.img_body,
-      color: hex(P.text_dark),
+      fontSize: sz(brand, "img_body", 14),
+      color: hex(P.text_dark, "text_dark"),
       breakLine: i < lines.length - 1,
     }),
   }));
@@ -370,20 +389,20 @@ function addContentImage(slide, f, brand) {
 
 function addClosing(slide, f, brand) {
   const P = brand.palette;
-  slide.background = { color: hex(P.navy_deep) };
+  slide.background = { color: hex(P.navy_deep, "navy_deep") };
 
   slide.addText(f.message || "감사합니다", koText(brand, {
     x: 0, y: 2.8, w: W, h: 1.5,
-    fontSize: brand.sizes_pt.closing,
-    bold: true, color: hex(P.white),
+    fontSize: sz(brand, "closing", 56),
+    bold: true, color: hex(P.white, "white"),
     align: "center", valign: "middle", margin: 0,
   }));
 
   if (f.tagline) {
     slide.addText(f.tagline, koText(brand, {
       x: 0, y: 4.4, w: W, h: 0.8,
-      fontSize: brand.sizes_pt.closing_tagline,
-      color: hex(P.blue_light), align: "center", margin: 0,
+      fontSize: sz(brand, "closing_tagline", 16),
+      color: hex(P.blue_light, "blue_light"), align: "center", margin: 0,
     }));
   }
 
@@ -398,7 +417,7 @@ function addCompanyTopRight(slide, brand, on_dark) {
     x: W - 2.7, y: 0.3, w: 2.2, h: 0.4,
     fontSize: 11,
     bold: true,
-    color: on_dark ? hex(P.white) : hex(P.navy_deep),
+    color: on_dark ? hex(P.white, "white") : hex(P.navy_deep, "navy_deep"),
     align: "right", margin: 0,
   }));
 }

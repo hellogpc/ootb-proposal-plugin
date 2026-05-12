@@ -9,6 +9,13 @@
     "height_inch": 7.5,
     "layout":      "LAYOUT_WIDE",
     "side_margin": 0.5,
+    "_v1_margin_alias": "render_deck.js 가 참조하는 v1 margin 구조 — v2에서는 side_margin 사용 권장",
+    "margin": {
+      "left":   0.5,
+      "right":  0.5,
+      "top":    0.4,
+      "bottom": 0.3
+    },
     "zones": {
       "header_strip":     { "y_top": 0.4,  "y_bottom": 0.7,  "purpose": "Chapter name (L) + Brandlogy logo (R)" },
       "headline":         { "y_top": 1.0,  "y_bottom": 1.75, "purpose": "Slide headline (대제목)" },
@@ -52,7 +59,19 @@
     "border":        "e5e7eb",
 
     "success_bg":    "e8ffea",
-    "success_text":  "16a34a"
+    "success_text":  "16a34a",
+
+    "_render_deck_aliases": "v1 render_deck.js가 참조하는 레거시 키 별칭. v2 신규 토큰 사용 권장.",
+    "white":       "ffffff",
+    "bg_light":    "f8f9fa",
+    "navy_deep":   "0a1f44",
+    "navy":        "17437d",
+    "navy_soft":   "1e3a6e",
+    "blue":        "1456f0",
+    "blue_bright": "3daeff",
+    "blue_light":  "bfdbfe",
+    "text_dark":   "222222",
+    "text_muted":  "8e8e93"
   },
 
   "gradient": {
@@ -88,8 +107,10 @@
 
   "fonts": {
     "primary":   "Pretendard",
+    "latin":     "Pretendard",
+    "east_asian":"Pretendard",
     "fallback":  "Pretendard, \"Pretendard Variable\", -apple-system, system-ui, sans-serif",
-    "_note": "Pretendard ONLY. Weight (not family) carries hierarchy. No DM Sans / Outfit / Poppins / Roboto / Noto / system defaults. Embed Pretendard in .pptx on export."
+    "_note": "Pretendard ONLY. Weight (not family) carries hierarchy. No DM Sans / Outfit / Poppins / Roboto / Noto / system defaults. Embed Pretendard in .pptx on export. (latin/east_asian는 v1 render_deck.js 호환 alias)"
   },
 
   "sizes_pt": {
