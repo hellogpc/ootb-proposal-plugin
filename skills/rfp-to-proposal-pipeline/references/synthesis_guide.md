@@ -11,8 +11,9 @@
 
 ## 출력
 
-- `ootb-proposal-pptx/templates/outline.example.yaml` 과 동일 스키마의 YAML
-- 7개 슬라이드 타입만 허용: `cover`, `toc`, `section_divider`, `hero`, `content`, `content_image`, `closing`
+- v2 outline.yaml (`references/brand_design.md` 와 매칭)
+- 5개 슬라이드 타입만 허용: `cover`, `section_divider`, `content`, `hero_takeaway`, `closing`
+- `content` 타입은 Pattern A–F (KPI Strip / Two-Column / Diagram / Process / Quote+Evidence / Stacked Insight) 중 하나 명시
 
 ## 작성 원칙
 

@@ -1,35 +1,35 @@
 ---
 name: rfp-to-proposal-pipeline
-description: "MUST USE for creating 오오티비랩 proposal decks from RFPs. Takes an RFP / 제안요청서 / 과업지시서 / 공고 (PDF or text), finds 3 similar past proposals via proposal-supabase-sync, synthesizes OOTB-format outline.yaml + .pptx via ootb-proposal-pptx. ALWAYS use (do NOT fall back to generic pptx) when user says: '제안서 만들어줘', '제안서 초안 짜줘', 'PPT 초안 뽑아줘', 'PPT 로 만들어줘', '슬라이드 초안', '피치덱', '과업지시서 로 초안', 'RFP 로 초안', '이번 과제로 제안서', '비슷한 거 참고해서', '같은 포맷으로'. Requires sibling skills + Supabase MCP. Do NOT use for non-proposal decks."
+description: "MUST USE for creating 오오티비랩 proposal decks from RFPs. Takes an RFP / 제안요청서 / 과업지시서 / 공고 (PDF or text), finds 3 similar past proposals via proposal-supabase-sync, synthesizes outline.yaml, then delegates to anthropic-skills:pptx for .pptx rendering (using bundled brand_tokens.json + brand_design.md as the OOTB design reference). ALWAYS use when user says: '제안서 만들어줘', '제안서 초안 짜줘', 'PPT 초안 뽑아줘', 'PPT 로 만들어줘', '슬라이드 초안', '피치덱', '과업지시서 로 초안', 'RFP 로 초안', '이번 과제로 제안서', '비슷한 거 참고해서', '같은 포맷으로'. Requires proposal-supabase-sync + Supabase MCP + anthropic-skills:pptx."
 ---
 
 # RFP → Proposal Pipeline
 
-This skill is a thin **orchestrator**. It doesn't reimplement DB or PPT logic — it chains the sibling skills:
+This skill is a thin **orchestrator**. It doesn't reimplement DB or PPT logic — it chains:
 
 1. **`proposal-supabase-sync`** (via Supabase MCP) — search past proposals, fetch content.
-2. **`ootb-proposal-pptx`** — build the final `.pptx` from a YAML outline.
+2. **`anthropic-skills:pptx`** — build the final `.pptx` from outline.yaml using OOTB brand reference (`references/brand_tokens.json` + `references/brand_design.md`).
 
-Claude is the synthesis engine in the middle. `prep_rfp.py` handles PDF text extraction only — structured extraction and embedding are handled by Claude + `gemini_embed_vault()` in DB.
+Claude is the synthesis engine in the middle. `prep_rfp.py` handles PDF text extraction only — structured extraction and embedding are handled by Claude + `gemini_embed_vault()` in DB. PPT 렌더링은 Claude 가 `anthropic-skills:pptx` 의 pptxgenjs 가이드 + 본 스킬의 brand reference를 합쳐 직접 코드 생성·실행.
 
 ## Preconditions (check before starting)
 
 - Supabase MCP is connected (look for `mcp__supabase__execute_sql` availability).
 - `proposals` table exists and has ≥ 1 ingested past proposal (ask: "DB에 과거 제안서가 몇 건 있나요?" → run `select count(*) from proposals;`).
 - Supabase Edge Function `embed` 가 배포되어 있고 환경변수 `GEMINI_API_KEY` 가 등록되어 있음 (Project Settings → Functions → Secrets). 로컬 `GEMINI_API_KEY` 불필요.
-- `ootb-proposal-pptx/scripts/` requirements installed.
+- `anthropic-skills:pptx` 가 Claude Cowork에서 사용 가능 (Anthropic 제공 기본 스킬).
 
 If none of the above, stop and direct the user to the relevant skill first.
 
 ## The workflow (6 steps)
 
-Paths below assume the two sibling skills live next to this one:
+Paths below assume the sibling skill lives next to this one:
 
 ```
 오오티비랩/
 ├── proposal-supabase-sync/
-├── ootb-proposal-pptx/
 └── rfp-to-proposal-pipeline/     ← you are here
+                                     (PPT 렌더링은 anthropic-skills:pptx 사용)
 ```
 
 ### Step 1 — Prep the RFP (local + Claude)
@@ -140,34 +140,39 @@ python scripts/analyze_reference.py \
 
 출력은 `per_deck`(덱마다 추출된 역할별 색) + `consensus`(덱 간 공통), 그리고 Claude 가 시각 검토할 수 있는 슬라이드 썸네일 JPG들. 이 JSON 을 Step 6 의 `prepare_deck.py --reference-palette` 에 넘기면 `brand.palette` 위에 덮어씌웁니다 (null 값은 스킵).
 
-### Step 6 — Build the deck_plan.json (ootb-proposal-pptx)
+### Step 6 — Render to .pptx (anthropic-skills:pptx)
 
-```bash
-python ../../ootb-proposal-pptx/scripts/prepare_deck.py \
-  /tmp/outline_<YYYYMMDD>.yaml \
-  --reference-palette /tmp/reference_palette.json   # Step 5 를 건너뛰었다면 생략 가능
-  -o /tmp/deck_plan_<YYYYMMDD>.json
-```
+PPT 렌더링은 **Claude 의 기본 `anthropic-skills:pptx` 스킬** 에 위임합니다. 별도 빌드 스크립트 없이 Claude 가 pptxgenjs 코드를 생성·실행해 `.pptx` 를 만듭니다.
 
-`prepare_deck.py` 는 구조 검증(TOC 수, content body 2~4, hero ≤ 2, section number 연속)도 함께 수행합니다.
+Claude 가 해야 할 일:
 
-### Step 7 — Render to .pptx (ootb-proposal-pptx, pptxgenjs)
+1. `anthropic-skills:pptx/pptxgenjs.md` 를 읽어 pptxgenjs API 파악
+2. 본 스킬의 **brand reference** 두 개를 함께 읽어 OOTB 디자인 시스템 반영:
+   - `references/brand_tokens.json` — 색상 / 폰트 / 사이즈 / 레이아웃 토큰 (Brandlogy v2)
+   - `references/brand_design.md` — 5-zone locked skeleton + 6 body patterns + Visualization-First Rule
+3. (선택) Step 5 의 `reference_palette.json` 이 있으면 `brand_tokens.json.palette` 위에 비-null 값으로 덮어쓰기
+4. `/tmp/outline_<YYYYMMDD>.yaml` 의 각 슬라이드를 brand_design.md 의 5-zone + 6 pattern 규칙에 따라 pptxgenjs 코드로 렌더링
+5. `/abs/path/to/<project>_초안.pptx` 로 저장
 
-```bash
-cd ../../ootb-proposal-pptx/scripts
-node render_deck.js /tmp/deck_plan_<YYYYMMDD>.json \
-  -o /abs/path/to/<project>_초안.pptx
-```
+핵심 제약 (brand_design.md 의 §0 참조):
+- 16:9 LAYOUT_WIDE 만
+- Pretendard only
+- Logo 원본 PNG 그대로 (배경 박스 / 밑줄 / 그림자 / 색변 / crop 금지)
+- 5-zone 좌표 모든 슬라이드 동일 (section divider / cover / closing 만 override 가능)
+- Body 2.39"–6.85" 안에만, 위·아래 zone 침범 금지
+- 데이터/비교/프로세스 슬라이드는 **차트 강제** (산문 나열 금지)
+- Hero Gradient 덱 전체 최대 3개
 
-pptxgenjs 가 `anthropic-skills:pptx` 의 표준 경로이므로 PowerPoint 에서 경고 없이 열립니다.
+### Step 7 — QA (optional but recommended)
 
-### Step 8 — QA (optional but recommended)
+생성된 `.pptx` 를 LibreOffice/PowerPoint 에서 열어 시각 검수:
+- 5-zone 좌표 일관성 (Header / Headline / Subtitle / Body / Footer)
+- Body box 내 콘텐츠 (위 2.39", 아래 6.85" 침범 없음)
+- Logo 추가 장식 없음 (원본 PNG 그대로)
+- Pretendard 임베드 확인
+- 차트 데이터 라벨 가독성 (9pt 이상)
 
-```bash
-python ../../ootb-proposal-pptx/scripts/quickcheck.py /abs/path/to/<project>_초안.pptx
-```
-
-Inspect the rendered JPGs for overflow / overlap. If a `content` slide has too many bullets, split it and rerun Step 7.
+문제가 보이면 outline.yaml 수정 후 Step 6 재실행.
 
 ## Files in this skill
 
@@ -180,7 +185,7 @@ Inspect the rendered JPGs for overflow / overlap. If a `content` slide has too m
 
 ## When to deviate from the default workflow
 
-- **No past proposals yet.** Skip Steps 2–3. Feed Step 4 with only the RFP + `ootb-proposal-pptx/templates/outline.example.yaml` as structural guide. Tell the user the output is a zero-shot draft — weaker than the full pipeline.
+- **No past proposals yet.** Skip Steps 2–3. Feed Step 4 with only the RFP + `references/brand_design.md` (5-zone skeleton + 6 patterns) as the structural guide. Tell the user the output is a zero-shot draft — weaker than the full pipeline.
 - **RFP is actually a paragraph, not a PDF.** Skip Step 1 (prep_rfp.py). Use the paragraph text directly as `rfp.query_text` in Step 2's `gemini_embed_vault()` call. Write the structured fields yourself from what the user pasted, then jump to Step 2.
 - **User wants more than 3 references.** Override `match_count => 5` or `10`. More references make synthesis richer but diminishing returns past ~5.
 - **User disagrees with the synthesis.** The outline.yaml is the source of truth — edit it directly, re-run Step 5. Don't regenerate from scratch.

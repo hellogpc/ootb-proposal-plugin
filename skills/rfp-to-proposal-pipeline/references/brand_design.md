@@ -1,6 +1,6 @@
 # OOTB Lab — Slide Blueprints v2 (Brandlogy-inspired, MiniMax-style)
 
-이 문서는 **렌더링 엔진**이 각 슬라이드를 어떻게 그려야 하는지를 정의한다. `ootb-proposal-pptx` 스킬은 이 문서를 `anthropic-skills:pptx` 의 pptxgenjs 가이드와 함께 사용해 최종 `.pptx` 를 만든다.
+이 문서는 **렌더링 엔진**이 각 슬라이드를 어떻게 그려야 하는지를 정의한다. `rfp-to-proposal-pipeline` 스킬의 Step 6에서 이 문서를 `anthropic-skills:pptx` 의 pptxgenjs 가이드 + `references/brand_tokens.json` 과 함께 합쳐 최종 `.pptx` 를 만든다.
 
 단위: **인치(inches)**. 좌표계는 슬라이드 좌상단 (0,0), 우하단 (W=13.333, H=7.5).
 

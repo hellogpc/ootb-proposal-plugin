@@ -58,35 +58,39 @@ Step 8  quickcheck.py            → slide-*.jpg (시각 점검)
 
 ### Step 4 — synthesize outline
 - `references/synthesis_guide.md` 를 읽고 작성
-- 슬라이드 순서: cover → toc → section_divider × N → hero × 선택 → content × M → content_image × 선택 → closing
+- 슬라이드 순서 (v2): cover → section_divider × N → content × M (Pattern A–F) → hero_takeaway × 0~2 → closing
 - YAML 을 쓰고 반드시 자체 검토:
   - [ ] project.title 이 RFP 의 `project_title` 과 일치
   - [ ] project.date 가 RFP 의 `deadline` 과 일치 (있다면)
-  - [ ] TOC 의 items 수 == section_divider 의 수
-  - [ ] content 슬라이드 각각 body.length ∈ [2, 4]
-  - [ ] hero 슬라이드 총 1~2 장 이내
+  - [ ] section_divider number 가 `"01"`/`"02"`... 연속
+  - [ ] content 슬라이드는 Pattern A–F 중 하나 명시 (`pattern: "A"`)
+  - [ ] hero_takeaway 슬라이드 총 1~2 장 이내
+  - [ ] Hero Gradient 사용 요소 덱 전체 ≤ 3
 
 ### Step 5 — analyze reference (선택)
 - [ ] 사용자가 "기존 덱 색 따라가게 해줘" / "같은 스타일로" 요청 시에만 실행
 - [ ] Step 2 결과의 `signed_url` 을 `--url` 인자로 넘기면 됨 (로컬 PDF 경로도 OK)
 - [ ] `per_deck` 내 각 덱의 `roles` 가 너무 편향되면(검정/흰색이 '색' 역할을 차지) consensus 주입 결과가 밋밋해질 수 있음 → 그럴 땐 skip
 
-### Step 6 — prepare deck plan
-- [ ] `prepare_deck.py outline.yaml -o deck_plan.json` exit code 0
-- [ ] Step 5 의 palette JSON 이 있으면 `--reference-palette` 로 주입
-- [ ] 검증 에러 메시지(TOC 수·body 길이·연속 번호)를 그대로 사용자에게 노출
-- [ ] `--validate` 만 따로 돌려 사전 체크 가능
+### Step 6 — render to .pptx (anthropic-skills:pptx)
+- [ ] `anthropic-skills:pptx/pptxgenjs.md` 읽음
+- [ ] `references/brand_tokens.json` + `references/brand_design.md` 읽음
+- [ ] Step 5 palette JSON 이 있으면 `brand_tokens.palette` 위에 비-null 값으로 덮어쓰기
+- [ ] 5-zone 좌표 모든 슬라이드 동일 (override 슬라이드 제외)
+- [ ] Body 2.39"–6.85" 안에만 — 위·아래 zone 침범 없음
+- [ ] 데이터/비교/프로세스 슬라이드 = 차트 또는 다이어그램 필수
+- [ ] Hero Gradient 덱 전체 ≤ 3
+- [ ] Logo 원본 PNG 그대로 (배경 박스 / 밑줄 / 그림자 / 색변 / crop 금지)
+- [ ] Pretendard 만, 다른 폰트 금지
+- [ ] `.pptx` 저장 후 PowerPoint 에서 경고 없이 열림
 
-### Step 7 — render to .pptx
-- [ ] `node render_deck.js deck_plan.json -o output.pptx` 성공
-- [ ] 사전에 `cd ootb-proposal-pptx/scripts && npm install` 완료 (최초 1회)
-
-### Step 8 — QA
-- [ ] `quickcheck.py` 로 생성된 `slide-*.jpg` 를 눈으로 확인
+### Step 7 — QA
+- [ ] LibreOffice 또는 PowerPoint 로 열어 5-zone 정합성 검수
 - 자주 나는 문제:
-  - hero 의 headline 이 7 자 이상이면 줄바꿈 → 문구 축약 또는 `brand/brand.json` 의 `hero_headline` 사이즈 조정
-  - content 의 body 가 4개 초과 → 2 개 슬라이드로 분리
-  - 한국어 tofu → 뷰어 머신에 Pretendard/Noto Sans KR 설치 여부 안내
+  - headline 한 줄 안 들어감 → Pretendard 32–40pt 사이에서 줄이거나 문구 축약
+  - body 가 6.85" 아래 침범 → Pattern F (Stacked Insight) 로 재구성 또는 슬라이드 분할
+  - 차트 데이터라벨 9pt 미만 → 차트 데이터 너무 많음, 분할 필요
+  - 한국어 tofu → `.pptx` 에 Pretendard 임베드 (Save options → Embed fonts) 확인
 
 ## 안티패턴
 

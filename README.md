@@ -11,8 +11,8 @@ Claude Cowork 에 설치해 과거 제안서를 DB 에 쌓고, 새 RFP/과업지
 │  │  Plugin: ootb-proposal-automation (GitHub 마켓플레이스)    │    │
 │  │  ├─ dashboard              ⭐ 메인 진입점                    │    │
 │  │  ├─ proposal-supabase-sync   PDF 등록·검색                 │    │
-│  │  ├─ rfp-to-proposal-pipeline RFP → outline.yaml          │    │
-│  │  └─ ootb-proposal-pptx       outline → .pptx              │    │
+│  │  └─ rfp-to-proposal-pipeline RFP → outline.yaml → .pptx   │    │
+│  │                              (.pptx는 anthropic-skills:pptx) │    │
 │  └─────────────┬──────────────────────────┬─────────────────┘    │
 │                │                           │                       │
 │        Supabase MCP                  로컬 Python                  │
@@ -74,8 +74,7 @@ RFP PDF
 |---|---|
 | **`dashboard`** | ⭐ 메인 진입점. 채팅 안 마크다운 카드 + AskUserQuestion 으로 대화형 메뉴 |
 | `proposal-supabase-sync` | 과거 제안서 PDF 를 Supabase DB + Storage 에 수집, 하이브리드 검색 |
-| `rfp-to-proposal-pipeline` | RFP → 유사 사례 top-3 검색 → outline.yaml 합성 |
-| `ootb-proposal-pptx` | outline.yaml 을 OOTB 브랜드 포맷의 `.pptx` 로 렌더 |
+| `rfp-to-proposal-pipeline` | RFP → 유사 사례 top-3 → outline.yaml → `.pptx` (렌더링은 `anthropic-skills:pptx` 위임, OOTB brand reference 포함) |
 
 ## 설치
 
@@ -105,8 +104,7 @@ RFP PDF
    ```bash
    pip install -r skills/proposal-supabase-sync/scripts/requirements.txt
    pip install -r skills/rfp-to-proposal-pipeline/scripts/requirements.txt
-   pip install -r skills/ootb-proposal-pptx/scripts/requirements.txt
-   cd skills/ootb-proposal-pptx/scripts && npm install
+   # PPT 렌더링은 anthropic-skills:pptx 가 Cowork 내장 의존성 처리
    ```
 
 > ✅ **로컬 `.env` 불필요** — 모든 시크릿은 Supabase Edge Function 환경변수에 보관됨
@@ -138,8 +136,8 @@ ootb-proposal-plugin/
     │   ├── scripts/prep.py        텍스트 추출 + HTTP 업로드
     │   ├── sql/                   001~004 마이그레이션
     │   └── edge-functions/        upload-binary, upload-b64
-    ├── rfp-to-proposal-pipeline/  RFP → outline 합성
-    └── ootb-proposal-pptx/        outline → .pptx (pptxgenjs)
+    └── rfp-to-proposal-pipeline/  RFP → outline 합성 + .pptx 렌더
+                                   (.pptx는 anthropic-skills:pptx + references/brand_*)
 ```
 
 ## 핵심 설계 원칙
@@ -161,7 +159,8 @@ ootb-proposal-plugin/
 
 ## 버전 이력
 
-- **0.6.1** — render_deck.js 버그 수정. brand.json 키 이름 불일치로 검은 화면 렌더링되던 문제 해결. v1 alias 키(navy_deep / blue / white / blue_light 등) + sizes_pt fallback 복원. hex() / sz() 함수에 명시적 경고 로그 추가 (누락 키 즉시 식별).
+- **0.7.0** — `ootb-proposal-pptx` 스킬 제거. PPT 렌더링은 `anthropic-skills:pptx` 에 위임. brand_tokens.json + brand_design.md 가 rfp-to-proposal-pipeline/references/ 로 이전. 스킬 4개 → 3개.
+- 0.6.1 — render_deck.js 버그 수정. brand.json 키 이름 불일치로 검은 화면 렌더링되던 문제 해결. v1 alias 키(navy_deep / blue / white / blue_light 등) + sizes_pt fallback 복원. hex() / sz() 함수에 명시적 경고 로그 추가 (누락 키 즉시 식별).
 - 0.6.0 — PPT 스킬을 **Brandlogy 디자인 시스템** (MiniMax-inspired) 으로 리디자인. 7-슬라이드 타입 → 5-zone locked skeleton + 6 body patterns (A: KPI Strip, B: Two-Column, C: Diagram-Centered, D: Process Flow, E: Quote+Evidence, F: Stacked Insight). White-dominant canvas + Pretendard-only + Hero Gradient accent + Visualization-First rule.
 - 0.5.5 — Vault 관련 가이드 잔재 정리. SKILL.md/README 전반에서 `vault.create_secret` 안내 제거하고 "Project Settings → Functions → Secrets" 가이드로 통일.
 - 0.5.4 — Vault 의존성 제거. 시크릿을 **Edge Function 환경변수**(`GEMINI_API_KEY`, `SERVICE_ROLE_KEY`)로 관리. 신규 Edge Function `embed`/`sign-url` + SQL 마이그레이션 `006_edge_secrets.sql`. SQL `gemini_embed_vault`/`sign_storage_url`은 이제 Edge Function을 호출.
