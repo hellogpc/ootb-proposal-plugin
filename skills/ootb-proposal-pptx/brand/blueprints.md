@@ -1,196 +1,323 @@
-# OOTB Lab — Slide Blueprints (for pptxgenjs rendering)
+# OOTB Lab — Slide Blueprints v2 (Brandlogy-inspired, MiniMax-style)
 
-이 문서는 **렌더링 엔진**이 각 슬라이드 타입을 어떻게 그려야 하는지를 정의한다. `ootb-proposal-pptx` 스킬은 이 문서의 내용을 그대로 `anthropic-skills:pptx`의 pptxgenjs 가이드(`pptxgenjs.md`)와 함께 사용해 최종 `.pptx`를 만든다.
+이 문서는 **렌더링 엔진**이 각 슬라이드를 어떻게 그려야 하는지를 정의한다. `ootb-proposal-pptx` 스킬은 이 문서를 `anthropic-skills:pptx` 의 pptxgenjs 가이드와 함께 사용해 최종 `.pptx` 를 만든다.
 
 단위: **인치(inches)**. 좌표계는 슬라이드 좌상단 (0,0), 우하단 (W=13.333, H=7.5).
 
-모든 색은 `brand.palette.*` 토큰 참조. 모든 폰트 크기는 `brand.sizes_pt.*` 토큰 참조.
-
-## Global rules
-
-- **텍스트박스는 margin: 0**. 도형/아이콘과 정렬이 맞아야 하므로 padding 제거.
-- **한글 텍스트에는 `fontFace` 외에 `eastAsiaFontFace`를 같이** 설정 (pptxgenjs 옵션 부재 시 XML 후처리로 `<a:ea>` 삽입). Latin=`brand.fonts.latin`, EA=`brand.fonts.east_asian`.
-- **accent underline 사용 금지** (AI-generated 느낌). 간격과 크기로 구분.
-- 슬라이드 사이즈는 `LAYOUT_WIDE` (13.333" × 7.5").
+모든 색은 `brand.palette.*` 토큰 참조. 모든 폰트 크기는 `brand.sizes_pt.*`, 두께는 `brand.weights.*` 참조.
 
 ---
 
-## 1) `cover`
+## 0. Production Constraints (Read First)
 
-대형 표지. Dark background.
+### Output
+- **16:9 슬라이드만** (PowerPoint standard 13.333" × 7.5", 참조 해상도 1920 × 1080 px). 다른 비율은 무효.
 
-| 요소 | 위치/크기 | 스타일 |
+### Brand Assets (mandatory)
+- **Logo**: 우상단에 원본 transparent PNG **있는 그대로**. 아래 위반 금지:
+  - 배경 박스 / 밑줄 / 그림자 / 광택 / 보더 / 프레임
+  - 색상 변경 / 그라데이션 / 투명도 변경 / 배경 채우기
+  - crop / stretch / skew / rotate / duplicate
+- **Logo 허용 작업만**: aspect-locked uniform scaling (≈1.22" × 0.24") + dark BG일 때 uniform white inversion.
+- **Typography**: Pretendard ONLY. DM Sans / Outfit / Poppins / Roboto / Noto / system defaults 금지. Weight(100~900)로 모든 위계 표현.
+
+### Slide Skeleton — 잠금 좌표 (모든 슬라이드 공통)
+
+| Zone | Y 범위 | 내용 | 스타일 |
+|---|---|---|---|
+| Header strip | 0.4"–0.7" | Chapter (L) · Logo (R) | Chapter: Pretendard 600 12pt `text_tertiary`. Logo: original PNG, ≈1.22"×0.24", top-right ≈0.5" from right |
+| Headline | 1.0"–1.75" | 대제목 | Pretendard 700 32–40pt `text_primary` line-height 1.20 |
+| Subtitle | 1.63"–2.03" | 부제목 (one-sentence lead) | Pretendard 500 16pt `text_secondary` line-height 1.45 |
+| Body | 2.39"–6.85" | 모든 본문 콘텐츠 | Mixed (§5 참조) |
+| Clearance buffer | 6.85"–7.05" | **반드시 빈 채로** | — |
+| Footer strip | 7.05"–7.3" | Page num (L) · Source (R) | Page: Pretendard 500 10pt `text_tertiary`. Source: Pretendard 400 9–10pt `text_tertiary` |
+
+**Vertical rhythm**: Header → Headline 0.3" (loose). Headline zone → Subtitle zone 0.1" zone-to-zone (시각 gap ≈0.13"). Subtitle bottom → Body top 0.36" (medium). 비균일 리듬이 타이틀 블록을 슬라이드 anchor로 만든다.
+
+**Lock rule**: 5개 zone은 슬라이드 간 좌표가 절대 바뀌지 않는다. Override는 section divider / full-bleed cover / closing slide만 허용 — "body가 길어서"는 사유 안 됨, 슬라이드 분할로 해결.
+
+**Hard boundary**: Body는 2.39"–6.85" 안에만. 상단 zone 침범 / 하단 buffer · footer 침범 금지. 4.46" 높이 초과 시 분할.
+
+### Body Density Rule
+하단 body box를 반쯤 비워두지 말 것. 차트 / 다이어그램 / KPI 타일 / 비교 표 / dual-column으로 채워라. 단 **body box 안에서만 채우기** — 6.85" 아래로, 2.39" 위로 침범 금지.
+
+콘텐츠가 얇을 때 사용할 density 전술:
+- 사이드 패널에 supporting evidence (quote, data point, mini-chart, source)
+- 하단에 "So What" callout box (6.85" 이내)
+- 다이어그램으로 headline 시각 보강
+- claim / evidence 2-column 분할
+- Pattern F (Stacked Insight Layers, §5) — body box 안 3개 수평 band
+
+장식용 shape / stock illustration으로 가짜 density 만들지 말 것.
+
+### Visualization-First Rule (강한 default)
+데이터 / 비교 / 프로세스 / 구조 / 관계가 있는 슬라이드는 **시각화**가 강제. 산문 나열 금지.
+
+**Trigger**: 다음 중 하나라도 해당하면 시각화 필수.
+- 2개 이상 숫자 비교 → chart 또는 KPI 타일 row
+- 시간 추세 → line chart 또는 timeline (2–3 point도 OK)
+- 구성 / 비중 → bar, donut, 100% stacked bar
+- 프로세스 / 순서 → horizontal arrow flow, numbered stages
+- 카테고리 비교 → grouped/stacked bar (table 보다 chart 선호)
+- 구조적 관계 → diagram, matrix, 2×2
+- 지리 / 계층 → map, tree, org chart
+
+**Visualization priority order**:
+1. Charts (bar / line / area / scatter / donut) — default
+2. KPI tiles with sparklines
+3. Diagrams (flow, sequence, 2×2, layered architecture, funnel, hierarchy)
+4. Annotated images / screenshots
+5. Tables — last resort
+
+**Constraints**:
+- Body box 내부에만
+- 슬라이드당 visualization 1–2개 max
+- 각 차트/다이어그램: title (Pretendard 600 14pt) + axis labels (400 10pt `text_secondary`) + source line (400 9pt `text_tertiary`)
+- 9pt 미만 폰트 필요하면 데이터 과다 — 분할
+- Pure-prose body는 section opener / hero takeaway / single-quote callout / definition에만
+
+---
+
+## 1. Slide Type Catalog
+
+전체 슬라이드 타입은 5개로 단순화. 모두 잠금 5-zone 스켈레톤을 따른다.
+
+| Type | 용도 | Body 구성 |
 |---|---|---|
-| 배경 | 전체 | `palette.navy_deep` solid |
-| 배경 이미지 (선택) | 전체 bleed | `data.background` 또는 `brand.cover_bg` 지정 시 — 덮어쓰기 |
-| 악센트 평행사변형 바 | x=-1.0, y=1.2, w=7.0, h=0.12 | `PARALLELOGRAM`, fill `palette.blue`, line none |
-| 타이틀 | x=1.2, y=2.4, w=11.0, h=2.4 | `sizes_pt.cover_title` / bold / color `palette.white` / center-align / middle-anchor |
-| 날짜 | x=1.2, y=5.8, w=11.0, h=0.4 | `sizes_pt.cover_date` / color `palette.white` / center |
-| 회사명 | x=1.2, y=6.3, w=11.0, h=0.4 | `sizes_pt.cover_company` / bold / color `palette.blue_light` / center |
-| 마스코트 (선택) | x=0.5, y=4.5, w=2.6 | `assets/mascot.png` 있으면 삽입 |
-
-데이터 필드:
-- `title` (없으면 `project.title`)
-- `date`  (없으면 `project.date`)
-- `company` (없으면 `brand.company_name`)
+| `cover` | 표지 | Hero gradient card (Pattern E variant) |
+| `section_divider` | 섹션 표지 | Override 허용 (full-bleed dark or gradient) |
+| `content` | 본문 | Body Pattern A–F 중 1개 선택 |
+| `hero_takeaway` | 단일 메시지 | Pull-quote + supporting evidence (Pattern E) |
+| `closing` | 클로징 | Override 허용 (full-bleed dark or gradient) |
 
 ---
 
-## 2) `toc`
+## 2. `cover` — 표지
 
-Index 페이지. Light background.
+- 배경: `palette.bg_primary` (`#ffffff`)
+- Header strip / Footer strip 5-zone 규칙 그대로 (Chapter 없으면 left blank, page num 표시)
+- Headline (1.0"–1.75"): 프로젝트명 / 발주처 — Pretendard 700 40pt `text_primary`
+- Subtitle (1.63"–2.03"): 한 줄 lead — Pretendard 500 16pt `text_secondary`
+- Body box (2.39"–6.85"): **단일 hero card with Hero Gradient**
+  - Position: 중앙 정렬, 너비 ~9", 높이 ~3.5"
+  - Background: `gradient.hero` (135°, blue spectrum)
+  - Radius: 24px
+  - Shadow: `brand_glow` (rgba(44,30,116,0.16) 0px 0px 15px)
+  - 안에 핵심 KPI 또는 메시지 — Pretendard 700 48pt `bg_primary` (white) + 라벨 Pretendard 500 12pt rgba(255,255,255,0.85)
+- Logo: top-right ≈0.5" right, y≈0.44", original PNG
 
-| 요소 | 위치/크기 | 스타일 |
+데이터 필드: `title`, `date`, `subtitle`, `hero_kpi` (선택, `{value: string, label: string}`)
+
+---
+
+## 3. `section_divider` — 섹션 표지
+
+- Override OK. 두 가지 옵션:
+  - **Option A — Dark**: 전체 `palette.text_dark_bg` (`#181e25`)
+  - **Option B — Gradient**: 전체 `gradient.hero` (premium)
+- Section number: top-left, Pretendard 600 14pt rgba(255,255,255,0.6)
+- Logo: top-right, **white-inverted variant** (uniform color inversion만 허용)
+- Section title: 중앙 정렬, Pretendard 700 56pt `bg_primary`
+- Section lead: title 아래, Pretendard 500 22pt rgba(255,255,255,0.7), line-height 1.45
+- Page number: bottom-left, rgba(255,255,255,0.6)
+
+데이터 필드: `number` (예: `"01"`), `title` (예: `"환경분석"`), `lead` (선택)
+
+권장: `number`는 `"01"~"04"` 형식 (한 글자 `"I"` 등은 가독성 저하).
+
+---
+
+## 4. `content` — 본문 슬라이드
+
+5-zone 잠금. Body box (2.39"–6.85", 12.333" × 4.46") 안에서 6 patterns 중 1개 선택.
+
+### Pattern A — KPI Strip + Detail (가장 흔함)
+
+| 요소 | 위치 | 스타일 |
 |---|---|---|
-| 배경 | 전체 | `palette.bg_light` |
-| "Index" 라벨 | x=1.5, y=1.2, w=3.5, h=1.2 | `sizes_pt.toc_label` / bold / `palette.blue` / center / middle-anchor |
-| (항목 i) 번호 배지 | x=5.8, y= (1.4 + i × 1.10), w=0.9, h=0.95 | `ROUNDED_RECTANGLE` rectRadius=0.15, fill `palette.blue`, 안에 텍스트 `"01"`/`"02"`.. `sizes_pt.toc_num` / bold / `palette.white` / center / middle-anchor |
-| (항목 i) 이름 | x=7.2, y=같음, w=5.5, h=0.95 | `sizes_pt.toc_item` / bold / `palette.navy_deep` / left / middle-anchor |
-| 우상단 회사명 | x=(W−2.7), y=0.3, w=2.2, h=0.4 | `sizes_pt.breadcrumb`×1.1 / bold / `palette.navy_deep` / right |
+| KPI row | body top, h ≈ 1.6" | 3–4 card, 각 ~3" × 1.6", white BG, 13px radius, `shadow.standard`, padding 20px |
+| KPI number | card 내부 | Pretendard 700 32pt `palette.brand_blue` |
+| KPI label | KPI number 아래 | Pretendard 500 11pt `text_secondary` |
+| Bottom half | y ≈ 4.3"–6.85" | 차트(primary `chart_palette.primary`) 또는 2-column claim/evidence |
 
-데이터 필드: `items: [string, ...]` (권장 4개)
+### Pattern B — Two-Column Compare
 
-항목 수(N)에 따라 `row_h=0.95, gap=0.15` 고정. N이 5 이상이면 row_h를 `(5.0 − 0.15×(N−1)) / N` 으로 축소해 영역에 맞춤.
-
----
-
-## 3) `section_divider`
-
-섹션 표지. Dark background.
-
-| 요소 | 위치/크기 | 스타일 |
+| 요소 | 위치 | 스타일 |
 |---|---|---|
-| 배경 | 전체 | `palette.navy_deep` |
-| 배경 이미지 (선택) | 전체 | `assets/section_bg.jpg` 있으면 사용 |
-| 번호 | x=0, y=2.3, w=W, h=1.5 | `sizes_pt.section_num` / bold / `palette.blue_light` / center / middle-anchor |
-| 액센트 얇은 바 | x=(W−0.6)/2, y=3.5, w=0.6, h=0.04 | fill `palette.blue` |
-| 타이틀 | x=0, y=3.6, w=W, h=1.5 | `sizes_pt.section_title` / bold / `palette.white` / center / middle-anchor |
+| Left column | x=0.5", w=5.5" | Header Pretendard 600 18pt `text_primary`, bullets 400 13pt `text_primary` line-height 1.50 |
+| Right column | x=6.4", w=5.5" | 같은 구조 + 차트/다이어그램 |
+| (선택) So What callout | body bottom 전폭, h≈0.7" | BG `bg_divider`, 13px radius, padding 16px, Pretendard 600 14pt `text_primary` |
 
-데이터 필드: `number` (예: `"I"`, `"01"`), `title` (예: `"환경분석"`)
+### Pattern C — Diagram-Centered
 
-권장: `number`는 `"01"`/`"02"`/`"03"`/`"04"` 형식. `"I"` 한 글자는 세로 얇은 획이 되어 가독이 떨어지므로 지양.
-
----
-
-## 4) `hero`
-
-단일 큰 메시지. Blue background.
-
-| 요소 | 위치/크기 | 스타일 |
+| 요소 | 위치 | 스타일 |
 |---|---|---|
-| 배경 | 전체 | `palette.blue_bright` |
-| eyebrow | x=1.0, y=1.8, w=11.3, h=0.5 | `sizes_pt.hero_eyebrow` / color `palette.blue_light` / center |
-| headline | x=1.0, y=2.4, w=11.3, h=1.9 | `sizes_pt.hero_headline` / bold / `palette.white` / center / middle-anchor |
-| subheadline | x=1.0, y=4.9, w=11.3, h=1.2 | `sizes_pt.hero_sub` / bold / center / wrap |
+| Centered diagram | body 70% | 다이어그램이 시각 hero |
+| Caption boxes (3–4) | 다이어그램 주변 | 각 부분 설명, Pretendard 400 12pt |
+| Bottom strip | body bottom 0.6" | Source + summary takeaway |
 
-`highlight` 필드가 지정되고 `subheadline` 안에 해당 문자열이 포함되면, 3개의 run으로 분할:
-1. before 부분: `palette.white`
-2. highlight 부분: `palette.navy_deep` + **흰색 배경 하이라이트** (텍스트박스 바로 뒤에 폭=대강 `(len(highlight)×0.14)` 인치 × 높이 0.55인치의 `RECTANGLE` fill=palette.white를 놓는다 — z-index 낮게)
-3. after 부분: `palette.white`
+### Pattern D — Process Flow
 
-highlight용 배경 박스의 x,y를 정확히 구하려면 텍스트 측정이 필요한데, 대안으로 간단하게 `palette.navy_deep` 색만으로 강조해도 OK. contrast가 살면 배경 박스 생략 가능.
-
----
-
-## 5) `content`
-
-본문 플로우 (2~4 블록). Light background + 하단 dark 컨테이너에 원형 노드들.
-
-| 요소 | 위치/크기 | 스타일 |
+| 요소 | 위치 | 스타일 |
 |---|---|---|
-| 배경 | 전체 | `palette.bg_light` |
-| breadcrumb | x=`M_LEFT`, y=0.3, w=8.0, h=0.3 | `sizes_pt.breadcrumb` / `palette.text_muted` / left |
-| 타이틀 | x=`M_LEFT`, y=0.9, w=(W−M_LEFT−M_RIGHT), h=1.4 | `sizes_pt.content_title` / bold / `palette.navy_deep` |
-| 컨테이너 rect | x=`M_LEFT`, y=2.6, w=(W−M_LEFT−M_RIGHT), h=4.2 | fill `palette.navy_deep`, line none |
-| 컨테이너 하단 액센트 바 | 같은 x/w, y=(2.6+4.2−0.05), h=0.05 | fill `palette.blue` |
-| 우상단 회사명/로고 | x=(W−2.7), y=0.3, w=2.2, h=0.4 | 상동 |
+| Stage circles (4–6) | body 상단 1/3 | 각 stage: numbered circle, label, 1–2 line desc |
+| Arrows | circle 간 연결 | `palette.blue_300`, 2pt |
+| Outcomes summary | body 하단 | Pull-quote 또는 결과 KPI |
 
-컨테이너 내부, N개 블록 (1 ≤ N ≤ 4):
+### Pattern E — Quote + Evidence
 
-- `col_w = container_w / N`
-- `circle_d = 2.0` (인치)
-- `top_pad = 0.6`
-
-블록 i별:
-- `cx = container_x + col_w × i + (col_w − circle_d)/2`
-- `cy = container_y + top_pad`
-- **외부 원**: `OVAL` at (cx, cy, circle_d, circle_d), fill = `i % 2 == 1 ? palette.blue : palette.navy`
-- **내부 원**: `OVAL` at (cx+0.15, cy+0.15, circle_d−0.3, circle_d−0.3), fill = `i % 2 == 1 ? palette.white : palette.navy_soft`
-- **heading 텍스트** (원 안): x=cx, y=(cy + circle_d × 0.32), w=circle_d, h=0.45 — `"[{heading}]"` — `sizes_pt.flow_heading` / bold / center / middle-anchor / color = `i % 2 == 1 ? palette.navy_deep : palette.blue_light`
-- **body 텍스트** (원 아래): x=(container_x + col_w × i + 0.1), y=(cy + circle_d + 0.1), w=(col_w − 0.2), h=1.3 — `sizes_pt.flow_body` / bold / `palette.white` / center / top-anchor / wrap
-- **화살표** (i < N−1일 때): LINE at (cx + circle_d + 0.05, cy + circle_d/2) → (container_x + col_w × (i+1) + (col_w − circle_d)/2 − 0.05, 같은 y), color `palette.blue_light`, width 2pt
-
-데이터 필드:
-- `breadcrumb` (예: `"환경분석 | 과업의 배경"`)
-- `title`
-- `body: [{ heading: string, text: string }, ...]` (2~4개)
-
----
-
-## 6) `content_image`
-
-좌우 이미지 + 텍스트. Light background.
-
-공통 상단부(breadcrumb · title · 우상단 회사명)는 `content`와 동일.
-
-하단 2단:
-- `col_w = (W − M_LEFT − M_RIGHT − 0.5) / 2`
-- `top = 2.7`, `h = 3.8`
-- `pos = data.image_position ∈ {left, right}` (default right)
-- `pos == "right"` 이면:
-  - 텍스트 영역: x=`M_LEFT`, y=top, w=col_w, h=h
-  - 이미지 영역: x=(W − M_RIGHT − col_w), y=top, w=col_w, h=h
-- `pos == "left"` 이면 반대
-
-**이미지 영역**:
-- `data.image` 경로가 주어지고 파일이 존재: `slide.addImage(path, x, y, w, h)` (sizing contain)
-- 없으면 placeholder — `ROUNDED_RECTANGLE` fill `palette.blue_light` + 중앙 텍스트 `"(image)"` 14pt `palette.navy`
-
-**텍스트 영역**:
-- `sizes_pt.img_body` / `palette.text_dark` / left / top-anchor / wrap
-
-`text` 가 여러 줄일 경우 `\n`으로 분리해 breakLine 처리. `· ` 접두사는 그대로 둔다 (불릿 스타일 X).
-
-데이터 필드: `breadcrumb`, `title`, `text`, `image` (선택), `image_position` (`"left"`/`"right"`, default right)
-
----
-
-## 7) `closing`
-
-클로징 슬라이드. Dark background.
-
-| 요소 | 위치/크기 | 스타일 |
+| 요소 | 위치 | 스타일 |
 |---|---|---|
-| 배경 | 전체 | `palette.navy_deep` |
-| message | x=0, y=2.8, w=W, h=1.5 | `sizes_pt.closing` / bold / `palette.white` / center / middle-anchor |
-| tagline | x=0, y=4.4, w=W, h=0.8 | `sizes_pt.closing_tagline` / `palette.blue_light` / center |
-| 마스코트 (선택) | x=0.5, y=3.0, w=2.8 | `assets/mascot.png` 있으면 |
+| Pull-quote | 좌측 50% | Pretendard 500 24–28pt `text_primary` |
+| Evidence stack | 우측 50% | 2–3 data card stack, white BG 13px radius |
+
+### Pattern F — Stacked Insight Layers (얇은 콘텐츠 density 보강)
+
+| 요소 | 위치 | 스타일 |
+|---|---|---|
+| Top band | body 상단 1/3 | KPI summary (1 row, 3–4 card) |
+| Middle band | body 중단 1/3 | 1개 chart 또는 diagram |
+| Bottom band | body 하단 1/3 | 3-up evidence card (claim + 1-line proof + source) |
+
+데이터 필드 (`content` 공통):
+- `chapter` (header strip 좌측)
+- `headline`
+- `subtitle`
+- `pattern` (`"A"`/`"B"`/`"C"`/`"D"`/`"E"`/`"F"`)
+- `body` (pattern별 schema 따름, §6 참조)
+- `source` (선택, footer 우측)
+
+---
+
+## 5. `hero_takeaway` — 단일 메시지
+
+`content` + Pattern E의 특수 케이스. 사용 빈도 낮음 (덱 전체 1–2장).
+
+- Headline은 일반 content보다 큼 (Pretendard 700 48pt)
+- Pull-quote가 body 70% 차지
+- 우측에 1개 supporting card만 (또는 KPI 1개)
+
+---
+
+## 6. `closing` — 클로징
+
+- Override OK. `section_divider`와 동일한 두 옵션:
+  - Dark `#181e25` 또는 Hero Gradient
+- Message: 중앙 정렬, Pretendard 700 56pt `bg_primary`
+- Tagline: message 아래, Pretendard 500 22pt rgba(255,255,255,0.7)
+- Logo: top-right white-inverted
 
 데이터 필드: `message` (default `"감사합니다"`), `tagline`
 
 ---
 
-## Asset paths (선택)
+## 7. Component Specifications
 
-`brand.assets_dir` (혹은 outline.yaml 옆 `assets/`) 에서 아래 파일이 있으면 자동 사용:
+### Buttons / Pills
+- **Pill Primary Dark**: BG `text_dark_bg`, text white, 11px 20px padding, 8px radius, Pretendard 600 13–14pt
+- **Pill Nav**: BG `rgba(0,0,0,0.05)`, text `text_heading`, radius 9999px, Pretendard 500 11–12pt
+- **Pill White**: BG white, text `rgba(24,30,37,0.8)`, radius 9999px
 
-| File | 쓰이는 곳 |
-|---|---|
-| `logo.png` | 우상단 (content/toc/content_image 슬라이드) |
-| `mascot.png` | cover · closing |
-| `cover_bg.jpg` | cover 풀블리드 |
-| `section_bg.jpg` | section_divider 풀블리드 |
+### Content Cards
+- **Standard**: BG white, 13–16px radius, `shadow.standard`, padding 16–24px
+- **Featured**: BG vivid gradient or white, 20–24px radius, `shadow.brand_glow`
+- **Data (chart container)**: BG white, 13px radius, 1px border `palette.border`, title row (600 14pt), source row (400 9pt)
 
-모두 없어도 정상 동작 (fall-back은 pure shape 렌더).
+### Charts
+- Primary series: `chart_palette.primary` (`#1456f0`) 또는 `chart_palette.secondary` (`#3b82f6`)
+- Secondary: `tertiary` / `quaternary` / `deep`
+- Comparison: `comparison` (`#ea5ec1`) 또는 `neutral`
+- Gridline: `gridline`, 1px
+- Axis labels: Pretendard 400 10pt `text_secondary`
+- Data labels: Pretendard 600 11pt `text_primary`
+- Source 인용: 차트 아래 9–10pt `text_tertiary`
+- **차트에 Hero Gradient 적용 금지** (false hierarchy 발생). 차트는 flat 색만.
+
+### Tables
+- Header: BG `bg_divider`, Pretendard 600 12pt `text_primary`
+- Body: 400 12pt, alternating BG white/#fafafa (선택)
+- Row divider: 1px `palette.border`. **세로 divider 없음**
+- Cell padding: 8px 12px
+
+### Hero Gradient — 사용 규칙
+- Linear-gradient(135°), 3 stops [#1456f0, #3b82f6, #60a5fa]
+- 허용 위치 (덱 전체 최대 3개):
+  1. Cover hero card
+  2. Section divider 배경
+  3. Featured KPI card (슬라이드당 1개)
+- 금지 위치: chart 데이터 / headline·body 텍스트 / header·footer / 일반 content card
+- 사용 시 `shadow.brand_glow` 와 함께. 위 텍스트는 white 500–700.
+- Gradient card는 20–24px radius 사용 (큰 쪽).
+
+### Depth & Elevation
+
+| Level | Shadow token | Use |
+|---|---|---|
+| 0 — Flat | none | 배경, in-flow text |
+| 1 — Subtle | `shadow.standard` | Standard cards |
+| 2 — Ambient | `shadow.soft_glow` | 주변 부드러운 glow |
+| 3 — Brand Glow | `shadow.brand_glow` | Featured/takeaway (슬라이드당 1개만) |
+| 4 — Elevated | `shadow.elevated` | Hero, hover-equivalent |
+
+### Border Radius Scale (px)
+4 / 8 / 13 / 16 / 20 / 24 / 32 / 9999. body card 기본 13–16px, hero card 20–24px, pill 9999px.
+
+### Spacing Scale (px)
+Base 4. Steps: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48 / 64 / 80. Card gap 16–24px, internal padding 16–24px.
 
 ---
 
-## Validation
+## 8. Validation (prepare_deck.py --validate)
 
-- section_divider 의 `number` 는 연속 (예: `"01","02","03","04"` 또는 `"I","II","III","IV"`).
-- TOC 항목 수 = section_divider 수.
-- `content.body` 길이는 2~4.
-- 각 `content.body[].text` 길이는 약 80자 이내 (오버하면 슬라이드 분할 권장).
-- hero 슬라이드는 덱 전체에 1~2장까지만 (synthesis_guide 참조).
+- 모든 슬라이드 5-zone 좌표 동일 (override 슬라이드 제외)
+- Body 콘텐츠 2.39"–6.85" 범위 내
+- Header strip · Footer strip 6.85" 클리어런스 침범 없음
+- Hero Gradient 요소 ≤ 3 (덱 전체)
+- Hero Gradient 차트/텍스트에 적용 안 됨
+- 슬라이드당 visualization 1–2개 (데이터 슬라이드 0개 = 경고)
+- Chart에 axis labels + source line 있음
+- 폰트는 Pretendard만
+- Logo가 top-right, 추가 장식 없음
+- Pretendard 폰트가 `.pptx`에 임베드됨
 
-렌더링 전 `prepare_deck.py --validate` 가 위 규칙을 체크한다.
+---
+
+## 9. Do's and Don'ts
+
+### Do
+- 5 zone을 모든 슬라이드에서 동일 좌표로 잠금
+- Body box를 dense하게 채우기 (차트 / KPI / 2-col / evidence stack)
+- Pretendard weight로만 hierarchy 표현
+- Pill radius 9999px / button 8px / content 16–24px
+- Brand Glow shadow는 슬라이드당 1개 featured에만
+- Body 400–500 기본, 700은 emphasis와 KPI 숫자에만
+- 모든 데이터 source는 9–10pt `text_tertiary` 인용
+
+### Don't
+- Body bottom 20–30% 비워두기 (restructure하거나 evidence 추가)
+- Pretendard 외 폰트 (DM Sans / Outfit / Poppins / Roboto / Noto / system) 금지
+- 5-zone 좌표 슬라이드별로 흩어짐 금지
+- 2.39" 위 / 6.85" 아래로 body 침범 금지
+- Brand pink (`ea5ec1`) body text / 버튼 적용 금지 (장식만)
+- Card sharp corner (radius ≥ 8px, body 13–24px)
+- Shadow opacity > 0.16
+- Hero Gradient를 chart bar / text / 일반 card에 적용 금지
+- Hero Gradient 슬라이드당 1개, 덱 전체 최대 3개
+- Gradient angle / stops / colors 변경 금지
+- 장식 shape / stock illustration으로 가짜 density
+- 두 번째 display family 추가 금지
+- Weight 800–900 body heading 사용 (closing / divider에만)
+- **Emoji 사용 금지** (슬라이드 어디에도)
+
+---
+
+## 10. Export Notes
+
+- 16:9 only. 4:3 / 1:1 / 9:16 / A4 / letter 등 거부
+- Export 해상도: 1920 × 1080 px minimum
+- **Pretendard 폰트 임베드 필수** (PowerPoint Save options → Embed fonts)
+- 모든 chart text + data label은 live text (raster 금지)
+
+---
+
+End of blueprints v2. 모든 슬라이드에 일관되게 적용.

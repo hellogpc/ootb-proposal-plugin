@@ -1,88 +1,155 @@
 # =====================================================================
-# OOTB Proposal PPT - outline example
+# OOTB Lab — outline.yaml v2 example (Brandlogy design system)
 # =====================================================================
-# Edit this file, then run:
-#   python scripts/build.py templates/outline.example.yaml -o my_deck.pptx
-# =====================================================================
+# 5-zone locked layout + 6 body patterns (A–F).
+# 모든 슬라이드는 자동으로 5-zone skeleton에 맞춰지고,
+# content type은 Pattern A–F 중 하나를 선택해 body를 채운다.
 
-brand:
-  company_name: "(주)오오티비랩"
-  # Optional file paths (relative to the yaml file). If missing, layouts fall
-  # back to pure-shape rendering with no errors.
-  # logo: assets/logo.png
-  # mascot: assets/mascot.png
-  # cover_bg: assets/cover_bg.jpg
+schema_version: "2.0"
 
 project:
-  title: "2026년 수산물이력제 홍보사업 제안"
-  date: "2026. 3. 20."
+  title:   "2026년 수산물이력제 홍보사업 제안서"
+  client:  "해양수산부"
+  date:    "2026-04-15"
 
 slides:
-
-  # -----------------------------------------------------------------
-  # 1) Cover
-  # -----------------------------------------------------------------
+  # ───────────────────────────────────────────────────────────────
+  # 1) Cover — Hero Gradient card (덱 최대 3개 중 1개)
+  # ───────────────────────────────────────────────────────────────
   - type: cover
+    title: "2026년 수산물이력제 홍보사업"
+    subtitle: "MZ세대를 향한 숏폼 콘텐츠 + 인플루언서 캠페인"
+    date: "2026.04.15"
+    hero_kpi:
+      value: "1,200만"
+      label: "캠페인 누적 도달 목표 (impressions)"
 
-  # -----------------------------------------------------------------
-  # 2) Table of contents ("Index")
-  # -----------------------------------------------------------------
-  - type: toc
-    items:
-      - "환경분석"
-      - "과업이해"
-      - "수행전략"
-      - "세부실행계획"
-
-  # -----------------------------------------------------------------
-  # 3) Section divider — big roman numeral or 01, 02...
-  # -----------------------------------------------------------------
+  # ───────────────────────────────────────────────────────────────
+  # 2) Section Divider — Hero Gradient bg (premium) 또는 dark
+  # ───────────────────────────────────────────────────────────────
   - type: section_divider
-    number: "I"
+    number: "01"
     title: "환경분석"
+    lead: "수산물이력제 인지도 현황 + MZ세대 소비 트렌드"
+    bg: "gradient"   # "gradient" | "dark" (default: dark)
 
-  # -----------------------------------------------------------------
-  # 4) Hero — large centered statement
-  # -----------------------------------------------------------------
-  - type: hero
-    eyebrow: "[수산물이력제의 의미 재정립]"
-    headline: "수산물이력제"
-    subheadline: "믿고 먹는 수산물, 생산자와 소비자가 함께 만드는 투명한 유통"
-    highlight: "투명한 유통"    # this phrase gets accent color
-
-  # -----------------------------------------------------------------
-  # 5) Content — flow of 2–4 circle blocks connected by arrows
-  # -----------------------------------------------------------------
+  # ───────────────────────────────────────────────────────────────
+  # 3) Content — Pattern A (KPI Strip + Detail)
+  # ───────────────────────────────────────────────────────────────
   - type: content
-    breadcrumb: "환경분석 | 과제 및 목적"
-    title: "사업 추진 배경 및 서비스 분석에 기반한 전략적 홍보 추진"
+    chapter: "01 환경분석"
+    headline: "수산물이력제 인지도는 30%대에 정체"
+    subtitle: "20–30대 인지도는 전체 평균의 절반에 그침 — 핵심 타깃 공략 필요"
+    pattern: "A"
     body:
-      - heading: "홍보목적"
-        text: "수산물이력제 인지도 제고 및 이용률 향상"
-      - heading: "과업배경"
-        text: "국민의 수산물 안전성 체감도 제고 필요 / 이력제 확산"
-      - heading: "추진방향"
-        text: "타깃 맞춤형 온·오프라인 통합 캠페인 전개"
-      - heading: "홍보과제"
-        text: "효율적 홍보 콘텐츠 기획 및 제작"
+      kpi:
+        - { value: "32%", label: "전체 인지도 (2025)" }
+        - { value: "18%", label: "20대 인지도" }
+        - { value: "21%", label: "30대 인지도" }
+        - { value: "47%", label: "50대 인지도" }
+      detail:
+        type: "bar_chart"
+        title: "연령대별 수산물이력제 인지도 (%)"
+        data:
+          - { x: "20대",  y: 18 }
+          - { x: "30대",  y: 21 }
+          - { x: "40대",  y: 35 }
+          - { x: "50대",  y: 47 }
+          - { x: "60대+", y: 42 }
+        primary_color: "1456f0"
+    source: "해양수산부 2025년 인식조사 (n=2,400)"
 
-  # -----------------------------------------------------------------
-  # 6) Content with side image
-  # -----------------------------------------------------------------
-  - type: content_image
-    breadcrumb: "수행전략 | 채널 전략"
-    title: "MZ 공감형 숏폼 콘텐츠로 신뢰성 있게 알리는 수산물이력제"
-    # image: assets/sample.png         # optional — falls back to a placeholder block
-    image_position: right
-    text: |
-      · 인스타그램 릴스·유튜브 쇼츠를 중심으로 제작
-      · 방송기자 출신 크리에이터와의 협업으로 정보 전달 신뢰도 제고
-      · 어촌 현장 및 유통 단계별 검증 콘텐츠 시리즈화
-      · 주간 2편 이상 업로드로 노출 총량 확보
+  # ───────────────────────────────────────────────────────────────
+  # 4) Content — Pattern B (Two-Column Compare)
+  # ───────────────────────────────────────────────────────────────
+  - type: content
+    chapter: "01 환경분석"
+    headline: "기존 캠페인 vs. 본 제안의 차이점"
+    subtitle: "기존 노출 중심 → 본 제안은 참여 + 행동 전환 KPI 추구"
+    pattern: "B"
+    body:
+      left:
+        header: "기존 홍보 캠페인 (2023–2024)"
+        bullets:
+          - "TV·라디오 광고 중심"
+          - "30·40대 일반 소비자 타깃"
+          - "KPI: GRP·노출수만 측정"
+          - "이력제 사용 행동 전환 미측정"
+      right:
+        header: "본 제안 (2026)"
+        bullets:
+          - "숏폼 영상 200편 + 인플루언서 12명"
+          - "20–30대 MZ세대 타깃"
+          - "KPI: 도달 + 참여율 + 검색 증가율"
+          - "이력제 앱 다운로드 + QR 스캔 측정"
+      callout: "행동 전환 KPI 도입 → 예산 효율성 정량 평가 가능"
 
-  # -----------------------------------------------------------------
-  # 7) Closing — 감사합니다
-  # -----------------------------------------------------------------
+  # ───────────────────────────────────────────────────────────────
+  # 5) Section Divider — Dark
+  # ───────────────────────────────────────────────────────────────
+  - type: section_divider
+    number: "02"
+    title: "추진전략"
+    lead: "3단계 캠페인 플로우 + 콘텐츠 믹스"
+    bg: "dark"
+
+  # ───────────────────────────────────────────────────────────────
+  # 6) Content — Pattern D (Process Flow)
+  # ───────────────────────────────────────────────────────────────
+  - type: content
+    chapter: "02 추진전략"
+    headline: "3단계 캠페인 운영 플로우"
+    subtitle: "Q1 인지 → Q2 참여 → Q3 전환 → Q4 평가"
+    pattern: "D"
+    body:
+      stages:
+        - { num: "01", label: "인지 (Q1)", desc: "숏폼 60편 일괄 배포\n해시태그 챌린지 런칭" }
+        - { num: "02", label: "참여 (Q2)", desc: "인플루언서 12명 협업\nUGC 콘테스트 진행" }
+        - { num: "03", label: "전환 (Q3)", desc: "QR 스캔 이벤트\n앱 다운로드 캠페인" }
+        - { num: "04", label: "평가 (Q4)", desc: "성과 정량 분석\n2027 전략 도출" }
+      outcomes: "분기별 KPI 점검 → 다음 분기 콘텐츠 믹스 재설정"
+
+  # ───────────────────────────────────────────────────────────────
+  # 7) Content — Pattern F (Stacked Insight Layers)
+  # ───────────────────────────────────────────────────────────────
+  - type: content
+    chapter: "02 추진전략"
+    headline: "콘텐츠 믹스 + 채널 전략"
+    subtitle: "숏폼 70% / 인플루언서 20% / UGC 10% — 채널별 KPI 차등 적용"
+    pattern: "F"
+    body:
+      top:
+        kpi:
+          - { value: "200편", label: "숏폼 영상 제작" }
+          - { value: "12명",  label: "인플루언서 협업" }
+          - { value: "50건",  label: "UGC 콘테스트 채택" }
+      middle:
+        type: "donut_chart"
+        title: "콘텐츠 믹스 비중"
+        data:
+          - { name: "숏폼",       value: 70 }
+          - { name: "인플루언서", value: 20 }
+          - { name: "UGC",        value: 10 }
+      bottom:
+        evidence:
+          - { claim: "숏폼은 CPM 효율 최고",   proof: "타 카테고리 대비 53% 낮음",   src: "2025 디지털광고연감" }
+          - { claim: "인플루언서는 신뢰 보강", proof: "수산물 카테고리 신뢰도 +18%p", src: "Nielsen 2024" }
+          - { claim: "UGC는 참여 깊이 보강",   proof: "체류시간 평균 3.4배",         src: "Meta Foresight" }
+
+  # ───────────────────────────────────────────────────────────────
+  # 8) Hero Takeaway — Pattern E variant (덱 전체 1–2장)
+  # ───────────────────────────────────────────────────────────────
+  - type: hero_takeaway
+    chapter: "02 추진전략"
+    headline: "MZ세대에게 수산물이력제는 '안전'이 아니라 '투명함'으로 다가가야 한다"
+    quote: "우리 세대는 '안전한 먹거리'보다 '어디서 어떻게 왔는지 보여주는 정보'에 반응한다."
+    evidence:
+      - { value: "78%", label: "MZ세대가 '원산지·이력 투명성'을 중요하게 평가" }
+
+  # ───────────────────────────────────────────────────────────────
+  # 9) Closing
+  # ───────────────────────────────────────────────────────────────
   - type: closing
     message: "감사합니다"
-    tagline: "㈜오오티비랩과 함께하겠습니다"
+    tagline: "이력은 곧 신뢰입니다 — 수산물이력제, 2026년 새로운 한 걸음"
+    bg: "gradient"   # "gradient" | "dark"

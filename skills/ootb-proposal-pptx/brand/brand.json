@@ -1,6 +1,6 @@
 {
-  "$schema_version": "1.0",
-  "_comment": "OOTB Lab 제안서 브랜드 토큰. 렌더링 엔진(pptxgenjs 등)이 읽어서 사용. 팔레트/폰트/치수 변경은 여기서만.",
+  "$schema_version": "2.0",
+  "_comment": "OOTB Lab 제안서 브랜드 토큰 (Brandlogy-inspired, MiniMax-style). 5-zone locked layout + 6 body patterns. 렌더링 엔진(pptxgenjs)이 읽어서 사용. 변경은 여기서만.",
 
   "company_name": "(주)오오티비랩",
 
@@ -8,57 +8,180 @@
     "width_inch":  13.333,
     "height_inch": 7.5,
     "layout":      "LAYOUT_WIDE",
-    "margin": {
-      "left":   0.8,
-      "right":  0.8,
-      "top":    0.6,
-      "bottom": 0.6
+    "side_margin": 0.5,
+    "zones": {
+      "header_strip":     { "y_top": 0.4,  "y_bottom": 0.7,  "purpose": "Chapter name (L) + Brandlogy logo (R)" },
+      "headline":         { "y_top": 1.0,  "y_bottom": 1.75, "purpose": "Slide headline (대제목)" },
+      "subtitle":         { "y_top": 1.63, "y_bottom": 2.03, "purpose": "Subtitle (부제목, one-sentence lead)" },
+      "body":             { "y_top": 2.39, "y_bottom": 6.85, "purpose": "All body components (charts, KPIs, diagrams)" },
+      "clearance_buffer": { "y_top": 6.85, "y_bottom": 7.05, "purpose": "Empty — no content allowed" },
+      "footer_strip":     { "y_top": 7.05, "y_bottom": 7.3,  "purpose": "Page number (L) + source/footnote (R)" }
+    },
+    "logo": {
+      "anchor":       "top_right",
+      "y_baseline":   0.44,
+      "right_margin": 0.5,
+      "target_height_inch": 0.24,
+      "target_width_inch":  1.22,
+      "_note": "Insert original transparent PNG as-is. NO background fill, underline, shadow, recolor, crop, rotation. Uniform scale only. White-inverted variant allowed on dark/gradient backgrounds."
     }
   },
 
   "palette": {
-    "navy_deep":   "0F1E3C",
-    "navy":        "123876",
-    "navy_soft":   "17365D",
-    "blue":        "0087FF",
-    "blue_bright": "1685FB",
-    "blue_light":  "AFD6FE",
-    "white":       "FFFFFF",
-    "bg_light":    "EDEFEF",
-    "text_dark":   "1A1A1A",
-    "text_muted":  "6B7280"
+    "brand_blue":   "1456f0",
+    "sky_blue":     "3daeff",
+    "brand_pink":   "ea5ec1",
+
+    "blue_50":      "bfdbfe",
+    "blue_300":     "60a5fa",
+    "blue_500":     "3b82f6",
+    "blue_600":     "2563eb",
+    "blue_700":     "1d4ed8",
+    "blue_900":     "17437d",
+
+    "text_primary":   "222222",
+    "text_heading":   "18181b",
+    "text_dark_bg":   "181e25",
+    "text_secondary": "45515e",
+    "text_tertiary":  "8e8e93",
+    "text_helper":    "5f5f5f",
+
+    "bg_primary":    "ffffff",
+    "bg_secondary":  "f0f0f0",
+    "bg_divider":    "f2f3f5",
+    "border":        "e5e7eb",
+
+    "success_bg":    "e8ffea",
+    "success_text":  "16a34a"
+  },
+
+  "gradient": {
+    "hero": {
+      "angle": 135,
+      "stops": [
+        { "pos": 0,   "color": "1456f0" },
+        { "pos": 50,  "color": "3b82f6" },
+        { "pos": 100, "color": "60a5fa" }
+      ],
+      "_note": "Use sparingly: max 3 elements per deck (cover hero card / section divider bg / 1 featured KPI per slide). Pair with brand_glow shadow. NEVER on charts, text, headers, footers."
+    }
+  },
+
+  "shadow": {
+    "standard":          "rgba(0,0,0,0.08) 0px 4px 6px",
+    "soft_glow":         "rgba(0,0,0,0.08) 0px 0px 22.576px",
+    "brand_glow":        "rgba(44,30,116,0.16) 0px 0px 15px",
+    "brand_glow_offset": "rgba(44,30,116,0.11) 6.5px 2px 17.5px",
+    "elevated":          "rgba(36,36,36,0.08) 0px 12px 16px -4px"
+  },
+
+  "radius_px": {
+    "tag":      4,
+    "button":   8,
+    "card_sm":  13,
+    "card":     16,
+    "card_lg":  20,
+    "hero":     24,
+    "badge":    32,
+    "pill":     9999
   },
 
   "fonts": {
-    "latin":          "Arial",
-    "east_asian":     "Pretendard",
-    "east_asian_fallbacks": ["Noto Sans KR", "Malgun Gothic"]
+    "primary":   "Pretendard",
+    "fallback":  "Pretendard, \"Pretendard Variable\", -apple-system, system-ui, sans-serif",
+    "_note": "Pretendard ONLY. Weight (not family) carries hierarchy. No DM Sans / Outfit / Poppins / Roboto / Noto / system defaults. Embed Pretendard in .pptx on export."
   },
 
   "sizes_pt": {
-    "cover_title":      48,
-    "cover_date":       14,
-    "cover_company":    14,
+    "headline":         36,
+    "headline_min":     32,
+    "headline_max":     40,
 
-    "toc_label":        48,
-    "toc_num":          18,
-    "toc_item":         22,
+    "subtitle":         16,
 
-    "section_num":      54,
-    "section_title":    44,
+    "body_h2":          18,
+    "body_h3":          14,
+    "body":             13,
+    "body_emphasized":  13,
+    "body_bold":        13,
 
-    "hero_eyebrow":     16,
-    "hero_headline":    92,
-    "hero_sub":         24,
+    "kpi_number":       40,
+    "kpi_label":        11,
 
-    "breadcrumb":       10,
-    "content_title":    26,
-    "flow_heading":     16,
-    "flow_body":        12,
-    "img_body":         14,
+    "chapter":          12,
+    "page_num":         10,
+    "caption":          10,
+    "tag":              10,
+
+    "chart_title":      14,
+    "chart_axis":       10,
+    "chart_data_label": 11,
+    "chart_source":     9,
+
+    "section_number":   14,
+    "section_title":    56,
+    "section_lead":     22,
 
     "closing":          56,
-    "closing_tagline":  16,
-    "page_num":         9
+    "closing_lead":     22
+  },
+
+  "weights": {
+    "headline":     700,
+    "subtitle":     500,
+    "body_h2":      600,
+    "body_h3":      600,
+    "body":         400,
+    "body_emphasized": 500,
+    "body_bold":    700,
+    "kpi_number":   700,
+    "kpi_label":    500,
+    "chapter":      600,
+    "page_num":     500,
+    "caption":      400,
+    "chart_title":  600,
+    "chart_axis":   400,
+    "chart_label":  600,
+    "tag":          600,
+    "_note":        "Weight (not family) does the hierarchy work. Use 700/500/400 split."
+  },
+
+  "line_height": {
+    "headline":  1.20,
+    "subtitle":  1.45,
+    "body_h2":   1.40,
+    "body_h3":   1.45,
+    "body":      1.50,
+    "kpi_number": 1.10,
+    "chapter":   1.30,
+    "page_num":  1.30,
+    "caption":   1.40,
+    "tag":       1.20
+  },
+
+  "tracking_em": {
+    "body":      0,
+    "headline":  -0.025,
+    "_note":     "Tighten large headlines (32pt+) by -0.02 to -0.03em to compensate optical loosening."
+  },
+
+  "chart_palette": {
+    "primary":   "1456f0",
+    "secondary": "3b82f6",
+    "tertiary":  "60a5fa",
+    "quaternary":"bfdbfe",
+    "deep":      "17437d",
+    "comparison":"ea5ec1",
+    "neutral":   "8e8e93",
+    "gridline":  "e5e7eb"
+  },
+
+  "spacing_px": {
+    "base":          4,
+    "scale":         [4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80],
+    "card_gap":      20,
+    "section_padding": 20,
+    "headline_to_subtitle": 16,
+    "subtitle_to_body":    32
   }
 }
