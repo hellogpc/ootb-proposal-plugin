@@ -181,7 +181,7 @@ Claude 가 해야 할 일:
 - `SKILL.md` — this file.
 - `scripts/prep_rfp.py` — RFP PDF → JSON (text extraction).
 - `scripts/analyze_reference.py` — reference PDFs → dominant color palette + thumbnails.
-- `scripts/requirements.txt` — Python deps (`pdfplumber`, plus `Pillow`, `scikit-learn`, `requests` for `analyze_reference.py`).
+- `scripts/requirements.txt` — Python deps (`pdfplumber`, `python-dotenv`, plus `Pillow`, `scikit-learn`, `numpy`, `requests` for `analyze_reference.py`).
 - `references/workflow.md` — compact step-by-step playbook (for Claude to re-read mid-run if context gets fuzzy).
 - `references/synthesis_guide.md` — heuristics for composing v2 outline.yaml from the RFP + 3 past proposals (Pattern A–F rubric + NG conditions + diversity budget + v2 template).
 - `references/brand_design.md` — OOTB v2 design system (5-zone locked skeleton + 6 body patterns + Visualization-First Rule). Read in Step 6.
