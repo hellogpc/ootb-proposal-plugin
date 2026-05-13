@@ -9,7 +9,7 @@
     │
     ▼
 Step 1  prep_rfp.py              → /tmp/rfp.json
-        (pdfplumber + Gemini)      { rfp_meta, rfp_summary, query_text, query_embedding }
+        (pdfplumber)              { rfp_full_text, page_count, file_name }
     │
     ▼
 Step 2  Supabase MCP             → top-K similar 제안서
@@ -21,22 +21,20 @@ Step 3  Supabase MCP             → 해당 ID들의 full content
     │
     ▼
 Step 4  synthesize outline.yaml   (Claude 추론; synthesis_guide.md 참조)
-        → /tmp/outline_YYYYMMDD.yaml
+        → /tmp/outline_YYYYMMDD.yaml  (v2 schema, Pattern A–F)
     │
     ▼
 Step 5  analyze_reference.py     → /tmp/reference_palette.json  [선택]
         (Storage signed URL → 썸네일 → K-means 지배색 추출)
     │
     ▼
-Step 6  prepare_deck.py          → /tmp/deck_plan_YYYYMMDD.json
-        (outline + brand.json + [reference_palette] → 검증된 deck plan)
+Step 6  anthropic-skills:pptx    → /path/<project>_초안.pptx
+        (Claude 가 pptxgenjs 코드 생성·실행
+         · brand_tokens.json + brand_design.md 합쳐 OOTB 디자인 적용
+         · [선택] reference_palette 으로 brand_tokens.palette 덮어쓰기)
     │
     ▼
-Step 7  render_deck.js           → /path/<project>_초안.pptx
-        (pptxgenjs; anthropic-skills:pptx 표준 경로)
-    │
-    ▼
-Step 8  quickcheck.py            → slide-*.jpg (시각 점검)
+Step 7  시각 QA (LibreOffice / PowerPoint 직접 열어 검수)
 ```
 
 ## 각 단계 체크리스트
@@ -56,16 +54,24 @@ Step 8  quickcheck.py            → slide-*.jpg (시각 점검)
 - [ ] `in (...)` 에 정확히 top-K ID 전달
 - [ ] 각 row 의 `key_points`, `strategy`, `deliverables` 가 비어있지 않은지 확인 (비어있으면 해당 row 는 synthesis 에서 가중치 낮춤)
 
-### Step 4 — synthesize outline
-- `references/synthesis_guide.md` 를 읽고 작성
-- 슬라이드 순서 (v2): cover → section_divider × N → content × M (Pattern A–F) → hero_takeaway × 0~2 → closing
+### Step 4 — synthesize outline (v2 schema)
+- `references/synthesis_guide.md` 를 읽고 작성 — **v2 schema 필수**
+- 허용 타입 5종: `cover`, `section_divider`, `content`, `hero_takeaway`, `closing`
+- v1 타입 (`toc`, `hero`, `content_image`) **사용 금지**
+- 슬라이드 순서: cover → section_divider × N → (content | hero_takeaway) × M → closing
 - YAML 을 쓰고 반드시 자체 검토:
+  - [ ] `schema_version: "2.0"` 명시
   - [ ] project.title 이 RFP 의 `project_title` 과 일치
   - [ ] project.date 가 RFP 의 `deadline` 과 일치 (있다면)
   - [ ] section_divider number 가 `"01"`/`"02"`... 연속
-  - [ ] content 슬라이드는 Pattern A–F 중 하나 명시 (`pattern: "A"`)
+  - [ ] **모든 content 슬라이드에 `pattern: "A"~"F"` 명시**
+  - [ ] **같은 pattern 3장 이상 연속 없음** (다양성)
+  - [ ] Pattern F 비율 ≤ 30%
+  - [ ] Pattern 선택이 NG 조건에 걸리지 않음 (synthesis_guide.md §3 NG rules — 숫자 없는데 A 금지, 단계 ≤2 인데 D 금지 등)
   - [ ] hero_takeaway 슬라이드 총 1~2 장 이내
   - [ ] Hero Gradient 사용 요소 덱 전체 ≤ 3
+  - [ ] 각 content 에 `source` 필드 (footer 출처)
+  - [ ] 숫자·기관명·인물명 모두 `[확인 필요]` 또는 `(ref: past#N)` 표기
 
 ### Step 5 — analyze reference (선택)
 - [ ] 사용자가 "기존 덱 색 따라가게 해줘" / "같은 스타일로" 요청 시에만 실행
@@ -96,5 +102,9 @@ Step 8  quickcheck.py            → slide-*.jpg (시각 점검)
 
 - Step 4 에서 RFP 의 예산/숫자 없이 자체 추정값 채우기 ❌
 - Step 3 결과를 그대로 번역·복붙 ❌ (출처 표기 없이 타 기관 사례 재사용)
-- Step 6 전에 YAML 문법 오류 미검증 → `yaml.safe_load` 메시지를 그대로 사용자에게 전달
-- Step 7 에서 `_legacy/build.py` 사용 ❌ (PowerPoint strict validator 경고 유발; `render_deck.js` 사용)
+- Step 4 에서 모든 content 슬라이드를 동일 pattern (특히 F) 으로 채우기 ❌ (다양성 무너짐 → PPT 단조)
+- Step 4 에서 `pattern` 필드 누락 ❌
+- Step 4 에서 v1 타입 (`toc`, `hero`, `content_image`) 사용 ❌
+- Step 4 에서 NG 조건 무시 ❌ (숫자 없는데 A·단계 ≤2 인데 D·구조 없는데 C 등)
+- Step 6 에서 brand_design.md 의 5-zone / Hero Gradient 규칙 무시 ❌ (브랜드 일관성 무너짐)
+- Step 6 에서 brand_tokens.json 외 색상·폰트 임의 사용 ❌

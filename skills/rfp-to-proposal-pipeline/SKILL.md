@@ -121,9 +121,11 @@ Read `references/synthesis_guide.md` for how to compose the YAML. High-level:
 
 - Use the **RFP's own title / year / client / industry** as the spine.
 - Mine the three past proposals for **reusable motifs** (e.g., "방송기자 출신 크리에이터 협업", "월간 2편 이상 숏폼 업로드", "KPI 대시보드 주간 공유"). Pull the ones that actually fit the new RFP's 과업범위 and tag set — don't copy blindly.
-- Preserve OOTB format: `cover → toc → section_divider → hero → content × N → content_image × M → closing`.
-- For each `content` slide, produce 2–4 flow-box blocks (heading + text). This is where past `strategy` / `key_points` become the raw material — rephrased for the new context, not pasted.
-- **Cite the source.** In each content slide's body text, add a trailing `(ref: <past proposal id>)` if a phrase was materially drawn from one of the three; this makes it obvious to the user where to fact-check.
+- **Use OOTB v2 schema only**: `cover → section_divider × N → (content | hero_takeaway) × M → closing`. 5 types only — `toc`, `hero`, `content_image` (v1) **사용 금지**.
+- **Each `content` slide MUST specify `pattern: "A"~"F"`** matching the content shape (numbers→A, compare→B, diagram→C, process→D, quote→E, stacked narrative→F). See synthesis_guide.md Pattern Rubric + NG conditions.
+- **Diversity rule**: same pattern ≤ 2 consecutive; balance A·B·D·F across the deck; Pattern F ratio ≤ 30%.
+- **Visualization-first**: 숫자·비교·프로세스가 있으면 산문 나열 금지. RFP 의 평가배점·단계어·타깃 다중 등에서 시각화 raw input 적극 추출.
+- **Cite the source.** In each content slide's body, add `(ref: past#<id>)` if a phrase was materially drawn from one of the three past proposals. 각 슬라이드에 `source` 필드도 명시 (footer 우측).
 
 Write the outline to `/tmp/outline_<YYYYMMDD>.yaml` (or a user-specified path).
 
@@ -138,7 +140,7 @@ python scripts/analyze_reference.py \
   -t /tmp/reference_thumbs/
 ```
 
-출력은 `per_deck`(덱마다 추출된 역할별 색) + `consensus`(덱 간 공통), 그리고 Claude 가 시각 검토할 수 있는 슬라이드 썸네일 JPG들. 이 JSON 을 Step 6 의 `prepare_deck.py --reference-palette` 에 넘기면 `brand.palette` 위에 덮어씌웁니다 (null 값은 스킵).
+출력은 `per_deck`(덱마다 추출된 역할별 색) + `consensus`(덱 간 공통), 그리고 Claude 가 시각 검토할 수 있는 슬라이드 썸네일 JPG들. 이 JSON 의 `consensus` 값을 Step 6 에서 Claude 가 직접 읽어 `references/brand_tokens.json` 의 `palette` 위에 비-null 값만 덮어쓴 뒤 pptxgenjs 코드에 반영합니다.
 
 ### Step 6 — Render to .pptx (anthropic-skills:pptx)
 
@@ -177,18 +179,20 @@ Claude 가 해야 할 일:
 ## Files in this skill
 
 - `SKILL.md` — this file.
-- `scripts/prep_rfp.py` — RFP → JSON (structured fields + summary + query vector).
+- `scripts/prep_rfp.py` — RFP PDF → JSON (text extraction).
 - `scripts/analyze_reference.py` — reference PDFs → dominant color palette + thumbnails.
-- `scripts/requirements.txt` — same deps as sibling skills (`pdfplumber`, `google-genai`, `python-dotenv`, plus `Pillow`, `scikit-learn`, `requests` for `analyze_reference.py`).
+- `scripts/requirements.txt` — Python deps (`pdfplumber`, plus `Pillow`, `scikit-learn`, `requests` for `analyze_reference.py`).
 - `references/workflow.md` — compact step-by-step playbook (for Claude to re-read mid-run if context gets fuzzy).
-- `references/synthesis_guide.md` — heuristics for composing the outline.yaml from the RFP + 3 past proposals.
+- `references/synthesis_guide.md` — heuristics for composing v2 outline.yaml from the RFP + 3 past proposals (Pattern A–F rubric + NG conditions + diversity budget + v2 template).
+- `references/brand_design.md` — OOTB v2 design system (5-zone locked skeleton + 6 body patterns + Visualization-First Rule). Read in Step 6.
+- `references/brand_tokens.json` — OOTB brand tokens (palette / fonts / sizes / layout). Read in Step 6.
 
 ## When to deviate from the default workflow
 
 - **No past proposals yet.** Skip Steps 2–3. Feed Step 4 with only the RFP + `references/brand_design.md` (5-zone skeleton + 6 patterns) as the structural guide. Tell the user the output is a zero-shot draft — weaker than the full pipeline.
 - **RFP is actually a paragraph, not a PDF.** Skip Step 1 (prep_rfp.py). Use the paragraph text directly as `rfp.query_text` in Step 2's `gemini_embed_vault()` call. Write the structured fields yourself from what the user pasted, then jump to Step 2.
 - **User wants more than 3 references.** Override `match_count => 5` or `10`. More references make synthesis richer but diminishing returns past ~5.
-- **User disagrees with the synthesis.** The outline.yaml is the source of truth — edit it directly, re-run Step 5. Don't regenerate from scratch.
+- **User disagrees with the synthesis.** The outline.yaml is the source of truth — edit it directly, re-run Step 6 (render). Don't regenerate from scratch.
 
 ## Honesty guardrails (read this)
 
